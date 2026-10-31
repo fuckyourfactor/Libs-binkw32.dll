@@ -1,0 +1,85 @@
+name: Build binkw32.dll (FFmpeg, Windows x86)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    permissions:
+      contents: write # Required only when publishing a tag release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      FFMPEG_VERSION: '7.1.5'
+      FFMPEG_BUILD_ROOT: ${{ github.workspace }}/.build-ffmpeg
+      FFMPEG_PREFIX: ${{ github.workspace }}/.build-ffmpeg/prefix
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Windows x86 cross compiler and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-mingw-w64-i686-win32 binutils-mingw-w64-i686 \
+            cmake ninja-build make pkgconf curl xz-utils python3
+          i686-w64-mingw32-gcc --version
+
+      - name: Run portable unit tests before the cross-build
+        run: |
+          cmake -S . -B build-native -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBINK_WITH_FFMPEG=OFF -DBINK_BUILD_TESTS=ON
+          cmake --build build-native --parallel 4
+          ctest --test-dir build-native --output-on-failure
+
+      - name: Build FFmpeg Bink decoders as static Win32 libraries
+        run: bash tools/build_ffmpeg_mingw32.sh
+
+      - name: Configure replacement DLL with FFmpeg enabled
+        env:
+          PKG_CONFIG_LIBDIR: ${{ github.workspace }}/.build-ffmpeg/prefix/lib/pkgconfig
+          PKG_CONFIG_PATH: ''
+          PKG_CONFIG_ALLOW_SYSTEM_LIBS: '1'
+        run: |
+          cmake -S . -B build-win32-ffmpeg -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw32.cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBINK_WITH_FFMPEG=ON \
+            -DBINK_FFMPEG_STATIC=ON \
+            -DBINK_BUILD_TESTS=OFF
+          cmake --build build-win32-ffmpeg --target binkw32 --parallel 4
+
+      - name: Verify PE32, exact exports, static multimedia link, and filename
+        run: |
+          python3 tools/check_win32_dll.py \
+            build-win32-ffmpeg/binkw32.dll \
+            --require-static-ffmpeg \
+            --cmake-cache build-win32-ffmpeg/CMakeCache.txt
+          mkdir -p dist
+          install -m 644 build-win32-ffmpeg/binkw32.dll dist/binkw32.dll
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 1
+          sha256sum dist/binkw32.dll
+
+      # upload-artifact v7 supports a single file WITHOUT wrapping it in ZIP.
+      - name: Downloadable output (exactly binkw32.dll)
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/binkw32.dll
+          archive: false
+          if-no-files-found: error
+
+      - name: Publish standalone DLL asset to GitHub Release on version tags
+        if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" dist/binkw32.dll --clobber

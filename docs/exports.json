@@ -1,0 +1,332 @@
+[
+  {
+    "ordinal": 1,
+    "name": "_BinkBufferBlit@12",
+    "arguments_bytes": 12
+  },
+  {
+    "ordinal": 2,
+    "name": "_BinkBufferCheckWinPos@12",
+    "arguments_bytes": 12
+  },
+  {
+    "ordinal": 3,
+    "name": "_BinkBufferClear@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 4,
+    "name": "_BinkBufferClose@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 5,
+    "name": "_BinkBufferGetDescription@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 6,
+    "name": "_BinkBufferGetError@0",
+    "arguments_bytes": 0
+  },
+  {
+    "ordinal": 7,
+    "name": "_BinkBufferLock@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 8,
+    "name": "_BinkBufferOpen@16",
+    "arguments_bytes": 16
+  },
+  {
+    "ordinal": 9,
+    "name": "_BinkBufferSetDirectDraw@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 10,
+    "name": "_BinkBufferSetHWND@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 11,
+    "name": "_BinkBufferSetOffset@12",
+    "arguments_bytes": 12
+  },
+  {
+    "ordinal": 12,
+    "name": "_BinkBufferSetResolution@12",
+    "arguments_bytes": 12
+  },
+  {
+    "ordinal": 13,
+    "name": "_BinkBufferSetScale@12",
+    "arguments_bytes": 12
+  },
+  {
+    "ordinal": 14,
+    "name": "_BinkBufferUnlock@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 15,
+    "name": "_BinkCheckCursor@20",
+    "arguments_bytes": 20
+  },
+  {
+    "ordinal": 16,
+    "name": "_BinkClose@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 17,
+    "name": "_BinkCloseTrack@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 18,
+    "name": "_BinkControlBackgroundIO@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 19,
+    "name": "_BinkControlPlatformFeatures@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 20,
+    "name": "_BinkCopyToBuffer@28",
+    "arguments_bytes": 28
+  },
+  {
+    "ordinal": 21,
+    "name": "_BinkCopyToBufferRect@44",
+    "arguments_bytes": 44
+  },
+  {
+    "ordinal": 22,
+    "name": "_BinkDDSurfaceType@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 23,
+    "name": "_BinkDX8SurfaceType@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 24,
+    "name": "_BinkDX9SurfaceType@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 25,
+    "name": "_BinkDoFrame@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 26,
+    "name": "_BinkGetError@0",
+    "arguments_bytes": 0
+  },
+  {
+    "ordinal": 27,
+    "name": "_BinkGetFrameBuffersInfo@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 28,
+    "name": "_BinkGetKeyFrame@12",
+    "arguments_bytes": 12
+  },
+  {
+    "ordinal": 29,
+    "name": "_BinkGetPalette@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 30,
+    "name": "_BinkGetRealtime@12",
+    "arguments_bytes": 12
+  },
+  {
+    "ordinal": 31,
+    "name": "_BinkGetRects@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 32,
+    "name": "_BinkGetSummary@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 33,
+    "name": "_BinkGetTrackData@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 34,
+    "name": "_BinkGetTrackID@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 35,
+    "name": "_BinkGetTrackMaxSize@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 36,
+    "name": "_BinkGetTrackType@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 37,
+    "name": "_BinkGoto@12",
+    "arguments_bytes": 12
+  },
+  {
+    "ordinal": 38,
+    "name": "_BinkIsSoftwareCursor@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 39,
+    "name": "_BinkLogoAddress@0",
+    "arguments_bytes": 0
+  },
+  {
+    "ordinal": 40,
+    "name": "_BinkNextFrame@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 41,
+    "name": "_BinkOpen@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 42,
+    "name": "_BinkOpenDirectSound@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 43,
+    "name": "_BinkOpenMiles@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 44,
+    "name": "_BinkOpenTrack@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 45,
+    "name": "_BinkOpenWaveOut@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 46,
+    "name": "_BinkPause@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 47,
+    "name": "_BinkRegisterFrameBuffers@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 48,
+    "name": "_BinkRestoreCursor@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 49,
+    "name": "_BinkService@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 50,
+    "name": "_BinkSetError@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 51,
+    "name": "_BinkSetFrameRate@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 52,
+    "name": "_BinkSetIO@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 53,
+    "name": "_BinkSetIOSize@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 54,
+    "name": "_BinkSetMemory@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 55,
+    "name": "_BinkSetMixBinVolumes@20",
+    "arguments_bytes": 20
+  },
+  {
+    "ordinal": 56,
+    "name": "_BinkSetMixBins@16",
+    "arguments_bytes": 16
+  },
+  {
+    "ordinal": 57,
+    "name": "_BinkSetPan@12",
+    "arguments_bytes": 12
+  },
+  {
+    "ordinal": 58,
+    "name": "_BinkSetSimulate@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 59,
+    "name": "_BinkSetSoundOnOff@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 60,
+    "name": "_BinkSetSoundSystem@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 61,
+    "name": "_BinkSetSoundTrack@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 62,
+    "name": "_BinkSetVideoOnOff@8",
+    "arguments_bytes": 8
+  },
+  {
+    "ordinal": 63,
+    "name": "_BinkSetVolume@12",
+    "arguments_bytes": 12
+  },
+  {
+    "ordinal": 64,
+    "name": "_BinkShouldSkip@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 65,
+    "name": "_BinkWait@4",
+    "arguments_bytes": 4
+  },
+  {
+    "ordinal": 66,
+    "name": "_RADTimerRead@0",
+    "arguments_bytes": 0
+  }
+]
