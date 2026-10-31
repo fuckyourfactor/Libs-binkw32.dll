@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: MIT. Original fixed-point 16-bit PCM volume/pan. */
 #include "audio.h"
 static int clamp(int v,int min,int max){return v<min?min:v>max?max:v;}
 void bk_audio_mix(int16_t *out,const int16_t *in,uint32_t frames,uint32_t channels,int volume,int pan){

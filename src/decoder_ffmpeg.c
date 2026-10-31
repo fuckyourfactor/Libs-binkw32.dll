@@ -1,9 +1,3 @@
-/* SPDX-License-Identifier: MIT
- * Bink1 video + Bink Audio (RDFT / DCT) via the LGPL FFmpeg libraries.
- * Independent implementation; does not load the proprietary binkw32.dll.
- * Build-time dependency: libavformat, libavcodec, libavutil, libswscale,
- * libswresample. The binary can be redistributed subject to FFmpeg licensing.
- */
 #include "private.h"
 #include "platform.h"
 #include <limits.h>
@@ -34,8 +28,7 @@ typedef struct BkMemoryIO {
  int64_t length;
  int64_t position;
 } BkMemoryIO;
-/* AVIO virtual file: the Bink reader and FFmpeg see the SAME owned bytes,
- * including when rFactor calls BinkOpen(..., BINKFROMMEMORY). */
+
 static int bink_read(void *opaque,uint8_t *dst,int count){
  BkMemoryIO *io=(BkMemoryIO*)opaque;
  if(count<=0)return AVERROR(EINVAL);
@@ -55,7 +48,7 @@ static int64_t bink_seek(void *opaque,int64_t offset,int whence){
  else if(whence==SEEK_CUR)base=io->position;
  else if(whence==SEEK_END)base=io->length;
  else return AVERROR(EINVAL);
- /* Avoid signed overflow even for unusual seeks from damaged media. */
+
  if(offset< -base || offset>io->length-base)return AVERROR(EINVAL);
  io->position=base+offset;
  return io->position;
@@ -124,17 +117,17 @@ int bk_decoder_open(BkHandle *h,const char *path){
  d->next=0;return 1;
  failed:bk_decoder_close(h);return 0;
 }
-/* Sequential decode, reset on reverse seeks. Preserve temporal predictor state. */
+
 int bk_decoder_frame(BkHandle *h,uint32_t target){
  BkFFmpeg *d=(BkFFmpeg*)h->decoder;
  if(!d||!h->rgb||target>=h->api.Frames)return 0;
  if((int64_t)target<d->next-1){
-  /* Decoder restart: prior video frame state must not contaminate new seek. */
+
   bk_decoder_close(h);
   if(!bk_decoder_open(h,NULL))return 0;
   d=(BkFFmpeg*)h->decoder;
  }
- if((int64_t)target==d->next-1){ /* Current decoded AVFrame still available. */
+ if((int64_t)target==d->next-1){
   if(!d->frame->data[0])return 0;
  } else {
   while(d->next<=(int64_t)target){
@@ -213,8 +206,7 @@ static int convert_audio_frame(BkFFAudio *a){
  if(n<0)return 0;
  a->pcm_size+=(uint32_t)n*(uint32_t)channels*2u;return 1;
 }
-/* Return a PCM block belonging to exactly the selected Bink frame.
- * Decode earlier frames to keep Bink audio's stateful prediction continuous. */
+
 int bk_audio_get(BkHandle *h,uint32_t track,uint32_t frame,
                  const uint8_t **out,uint32_t *size){
  if(!out||!size||frame>=h->index.frames)return 0;

@@ -1,6 +1,3 @@
-/* SPDX-License-Identifier: MIT
-   Independently written compatibility declarations for the 32-bit Bink API.
-   ABI structure layouts beyond the documented public prefix remain unverified. */
 #ifndef BINK_OPEN_32_H
 #define BINK_OPEN_32_H
 #include <stdint.h>
@@ -26,10 +23,7 @@ typedef struct BINKFRAMEBUFFERS {
 typedef struct BINK {
  U32 Width,Height,Frames,FrameNum,LastFrameNum,FrameRate,FrameRateDiv,ReadError,OpenFlags;
  U32 BinkType,Size,FrameSize,SndSize;
- /* Observed in the original Bink 1.8f (2005) binary:
-  * BinkGetRects accesses FrameRects at +0x34 and NumRects at +0xB4.
-  * IMPORTANT: This particular binary has no FrameChangePercent here.
-  * Other Bink SDK revisions use incompatible layouts. */
+
  BINKRECT FrameRects[8];
  S32 NumRects;
  BINKFRAMEBUFFERS *FrameBuffers;
@@ -41,7 +35,7 @@ typedef struct BINK {
  U32 Highest1SecRate,Highest1SecFrame;
  S32 Paused;
  U32 BackgroundThread;
- /* Not part of the claimed verified ABI. Private storage begins in an enclosing object. */
+
 } BINK;
 typedef BINK *HBINK;
 typedef struct BINKTRACK {
@@ -61,7 +55,7 @@ typedef struct BINKREALTIME {
  U32 FramesAudioDecompTime,FramesReadTime,FramesIdleReadTime,FramesThreadReadTime;
  U32 FramesBlitTime,ReadBufferSize,ReadBufferUsed,FramesDataRate;
 } BINKREALTIME;
-/* The pixel buffer public prefix. Do not assume its private tail matches the SDK. */
+
 typedef struct BINKBUFFER {
  U32 Width,Height,WindowWidth,WindowHeight,SurfaceType;
  void *Buffer; S32 BufferPitch,ClientOffsetX,ClientOffsetY;
@@ -76,9 +70,7 @@ typedef struct BINKBUFFER {
 typedef BINKBUFFER *HBINKBUFFER;
 typedef void *(BK_CALL *BINKMEMALLOC)(U32);
 typedef void (BK_CALL *BINKMEMFREE)(void *);
-/* Public Bink sound driver callbacks reconstructed from published API facts.
- * The parts of BINKSND beyond these public fields are not ABI-verified against
- * the supplied 2005 binary. All driver callbacks are stdcall on 32-bit Win32. */
+
 typedef struct BINKSND BINKSND;
 typedef S32 (BK_CALL *BINKSNDREADY)(BINKSND*);
 typedef S32 (BK_CALL *BINKSNDLOCK)(BINKSND*,uint8_t**,U32*);
@@ -125,8 +117,7 @@ typedef void *(BK_CALL *BINKIOOPEN)(void *);
 #define BINKGETKEYNEXT 1
 #define BINKGETKEYCLOSEST 2
 #define BINKGETKEYNOTEQUAL 128
-/* All names below are present in the sample's export table; signatures which
-   depend on third-party API types require further differential validation. */
+
 BK_API HBINKBUFFER BK_CALL BinkBufferOpen(void*,U32,U32,U32);
 BK_API void BK_CALL BinkBufferCheckWinPos(HBINKBUFFER,S32*,S32*);
 BK_API S32 BK_CALL BinkBufferClear(HBINKBUFFER,U32);

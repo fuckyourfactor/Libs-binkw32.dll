@@ -1,15 +1,5 @@
 #!/usr/bin/env python3
-"""Create MinGW PE export aliases without changing the public ABI manifest.
 
-PE32 COFF objects use the leading underscore on symbols (e.g. _BinkOpen@8).
-GNU ld's .def parser adds that underscore to the *internal* alias automatically,
-so referencing _BinkOpen@8 directly from the .def can look for a double
-underscore and produce 'cannot export ... symbol not defined'.
-
-The public export name stays _BinkOpen@8, with original ordinal; the internal
-reference in the MinGW .def is BinkOpen@8.
-"""
-# SPDX-License-Identifier: MIT
 import argparse
 import json
 from pathlib import Path
@@ -17,14 +7,8 @@ import re
 
 PATTERN = re.compile(r'^\s*(_([A-Za-z][A-Za-z0-9_]*)@(\d+))\s+@(\d+)\s*$')
 
-
 def generate(source: Path, manifest: Path, public_prefix: str = 'single') -> str:
-    """Produce public PE names and correct COFF internal aliases.
 
-    `single` is the nominal public spelling. Some MinGW linker versions
-    strip or add a COFF prefix; the workflow inspects the linked PE and only
-    switches to `double` or `none` when that precisely repairs the exports.
-    """
     if public_prefix not in ('single', 'double', 'none'):
         raise ValueError(f'Unknown public name prefix: {public_prefix}')
     public_lead = {'single': '_', 'double': '__', 'none': ''}[public_prefix]
@@ -46,7 +30,6 @@ def generate(source: Path, manifest: Path, public_prefix: str = 'single') -> str
     return ('LIBRARY binkw32\nEXPORTS\n' + ''.join(
         f'    {public_lead}{x["name"][1:]} = {x["internal"]} @{x["ordinal"]}\n' for x in exports))
 
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('source', type=Path)
@@ -58,7 +41,6 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(data, encoding='ascii')
     print(f'Created GNU MinGW export aliases in {args.output}')
-
 
 if __name__ == '__main__':
     main()

@@ -1,7 +1,3 @@
-/* SPDX-License-Identifier: MIT
- * BINK_OPEN_TRACE=absolute_log_path enables append-only diagnostic messages.
- * Win32 uses Kernel32 APIs; no extra runtime DLLs are required.
- */
 #include "trace.h"
 #include <stdarg.h>
 #ifdef _WIN32

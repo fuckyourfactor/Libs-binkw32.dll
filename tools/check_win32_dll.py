@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Check output is PE32 x86, exact original .def exports, and standalone link."""
-# SPDX-License-Identifier: MIT
+
 import argparse
 from pathlib import Path
 import re
@@ -35,7 +34,7 @@ if int.from_bytes(pe[24:26], 'little') != 0x10b:
 
 subprocess.run(
     [sys.executable, str(project / 'tools/check_def.py'),
-     str(project / 'src/binkw32.def'), str(project / 'docs/exports.json'),
+     str(project / 'src/binkw32.def'), str(project / 'tools/exports.json'),
      str(args.dll)], check=True,
 )
 

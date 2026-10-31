@@ -1,7 +1,3 @@
-/* SPDX-License-Identifier: MIT
- * COM surface introspection based only on published DirectDraw/Direct3D ABI.
- * These are experimental mappings, not validated against RAD's 2005 binary.
- */
 #include "surface.h"
 #include "bink32.h"
 #include <stdint.h>
@@ -12,20 +8,19 @@
 #define FOURCC(a,b,c,d) ((uint32_t)(a)|((uint32_t)(b)<<8)|((uint32_t)(c)<<16)|((uint32_t)(d)<<24))
 static int32_t map_d3d(uint32_t fmt){
  switch(fmt){
-  case 20: return BINKSURFACE24; /* D3DFMT_R8G8B8 */
-  case 21: return BINKSURFACE32A; /* D3DFMT_A8R8G8B8 */
-  case 22: return BINKSURFACE32; /* D3DFMT_X8R8G8B8 */
-  case 23: return BINKSURFACE565; /* D3DFMT_R5G6B5 */
-  case 24: return BINKSURFACE555; /* D3DFMT_X1R5G5B5 */
-  case 25: return BINKSURFACE5551; /* D3DFMT_A1R5G5B5 */
-  case 26: return BINKSURFACE4444; /* D3DFMT_A4R4G4B4 */
+  case 20: return BINKSURFACE24;
+  case 21: return BINKSURFACE32A;
+  case 22: return BINKSURFACE32;
+  case 23: return BINKSURFACE565;
+  case 24: return BINKSURFACE555;
+  case 25: return BINKSURFACE5551;
+  case 26: return BINKSURFACE4444;
   case FOURCC('Y','U','Y','2'):return BINKSURFACEYUY2;
   case FOURCC('U','Y','V','Y'):return BINKSURFACEUYVY;
   default:return -1;
  }
 }
-/* GetDesc at COM vtable index 12 for IDirect3DSurface8 and 9. The format
- * field is first; 64-byte output provides extra guard space for DX variants. */
+
 int32_t bk_d3d_surface_type(void *surface){
  if(!surface)return -1;
  void **vt=*(void***)surface;if(!vt||!vt[12])return -1;
@@ -34,7 +29,7 @@ int32_t bk_d3d_surface_type(void *surface){
  if(((GetDesc)vt[12])(surface,desc)<0)return -1;
  return map_d3d(desc[0]);
 }
-/* GetPixelFormat is COM slot 21 for classic DirectDraw surface interfaces. */
+
 int32_t bk_dd_surface_type(void *surface){
  if(!surface)return -1;
  void **vt=*(void***)surface;if(!vt||!vt[21])return -1;

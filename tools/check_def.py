@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
-"""Verify .def manifest and exact compiled PE export names/ordinals.
 
-Reads the actual export directory, not platform-dependent objdump formatting.
-"""
-# SPDX-License-Identifier: MIT
 import json
 from pathlib import Path
 import re
 import sys
 
 from pe_exports import PEExportError, read_exports
-
 
 def main():
     if not 3 <= len(sys.argv) <= 4:
@@ -47,7 +42,6 @@ def main():
                     print(f'  ... plus {len(differences) - 8} additional mismatches', file=sys.stderr)
             raise SystemExit(1)
         print(f'OK: compiled PE exports match original names and ordinals ({len(actual)})')
-
 
 if __name__ == '__main__':
     try:

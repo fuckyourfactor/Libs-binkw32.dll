@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: MIT
-# Build only the FFmpeg libraries/codecs needed for Bink1 into static .a files.
-# Windows x86 cross compilation; no proprietary Bink binaries or codecs.
+
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -56,7 +54,6 @@ cd "$build_root/build"
 make -j"$(nproc)"
 make install
 
-# Do not accept a "successful" build without every required archive.
 for module in avformat avcodec avutil swscale swresample; do
   test -s "$prefix/lib/lib${module}.a" || {
     echo "Missing static FFmpeg library: lib${module}.a" >&2; exit 1;

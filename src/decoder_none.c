@@ -1,4 +1,3 @@
-/* Metadata-only configuration. Decoder requests must fail visibly. */
 #include "private.h"
 int bk_decoder_open(BkHandle *h,const char *path){(void)h;(void)path;return 0;}
 int bk_decoder_frame(BkHandle *h,uint32_t f){(void)h;(void)f;return 0;}

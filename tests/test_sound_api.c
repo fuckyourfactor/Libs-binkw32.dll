@@ -14,7 +14,7 @@ int main(void){
  assert(BinkSetSoundSystem(BinkOpenDirectSound,0)==1);
  assert(BinkSetSoundSystem(BinkOpenMiles,0)==1);
  BINKSND snd={0};
- /* On non-Windows targets WaveOut cannot initialize; gracefully reject it. */
+
 #ifndef _WIN32
  assert(driver(&snd,44100,16,2,0,0)==0);
 #endif

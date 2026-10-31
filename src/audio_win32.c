@@ -1,7 +1,3 @@
-/* SPDX-License-Identifier: MIT
- * WinMM waveOut backing for decoded interleaved PCM. No RAD or Bink dependency.
- * Hand-declared Win32 ABI allows cross compilation without Windows SDK.
- */
 #include "audio.h"
 #include "platform.h"
 #include <stddef.h>
@@ -10,7 +6,7 @@
 #define WHDR_DONE 1u
 #define WAVE_MAPPER 0xFFFFFFFFu
 #define WAVE_FORMAT_PCM 1u
-/* WAVEHDR and WAVEFORMATEX layouts follow the Win32 multimedia ABI on x86. */
+
 typedef struct {uint16_t format,channels;uint32_t rate,avg;uint16_t align,bits,extra;} BK_WAVEFORMAT;
 typedef struct BK_WAVEHDR {char *data;uint32_t len,recorded;uintptr_t user;uint32_t flags,loops;struct BK_WAVEHDR *next;uintptr_t reserved;} BK_WAVEHDR;
 __declspec(dllimport) uint32_t __stdcall waveOutOpen(void **,uint32_t,const BK_WAVEFORMAT*,uintptr_t,uintptr_t,uint32_t);
@@ -34,7 +30,7 @@ int bk_wave_submit(void *opaque,const int16_t *pcm,uint32_t bytes,int volume,int
  BkWave *w=(BkWave*)opaque;if(!w||!pcm||!bytes||bytes>8*1024*1024 || bytes%(w->channels*2))return 0;
  uint32_t slot=w->next;BK_WAVEHDR *h=&w->headers[slot];
  if(w->prepared[slot]){
-  if(!(h->flags&WHDR_DONE))return 0; /* Backpressure, never overwrite queued audio. */
+  if(!(h->flags&WHDR_DONE))return 0;
   if(waveOutUnprepareHeader(w->dev,h,sizeof(*h))!=0)return 0;
   w->prepared[slot]=0;bk_free(h->data);bk_memset(h,0,sizeof(*h));
  }

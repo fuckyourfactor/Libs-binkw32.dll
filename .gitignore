@@ -1,4 +1,3 @@
-# Build artifacts are never part of the source repository.
 /build/
 /build-*/
 /.build-ffmpeg/

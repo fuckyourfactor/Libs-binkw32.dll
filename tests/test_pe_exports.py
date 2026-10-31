@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Test the real PE export reader using synthetic minimal PE32 images.
 
-No Bink, FFmpeg, or proprietary test binaries are required.
-"""
-# SPDX-License-Identifier: MIT
 import json
 from pathlib import Path
 import struct
@@ -12,16 +8,11 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
-from pe_exports import PEExportError, read_exports  # noqa: E402
-from choose_mingw_def import recommend  # noqa: E402
-
+from pe_exports import PEExportError, read_exports
+from choose_mingw_def import recommend
 
 def make_pe(exports):
-    """Construct PE32 with one .edata section and named exports.
 
-    `exports` is a list of (name, ordinal); no actual executable code is
-    needed for inspecting the metadata.
-    """
     data = bytearray(0x5000)
     data[:2] = b'MZ'
     struct.pack_into('<I', data, 0x3c, 0x80)
@@ -56,7 +47,6 @@ def make_pe(exports):
         str_rva += len(encoded)
     return bytes(data)
 
-
 def main():
     expected = [{'name': '_BinkClose@4', 'ordinal': 16},
                 {'name': '_BinkOpen@8', 'ordinal': 41}]
@@ -74,7 +64,6 @@ def main():
         dll.write_bytes(make_pe(extra))
         assert recommend(expected, read_exports(dll)) == 'none'
 
-        # No adjustment is permitted for missing ordinals or changed symbols.
         dll.write_bytes(make_pe([('_Other@4', 16), ('_BinkOpen@8', 41)]))
         assert recommend(expected, read_exports(dll)) is None
         dll.write_bytes(make_pe([('_BinkClose@4', 17), ('_BinkOpen@8', 41)]))
@@ -87,14 +76,12 @@ def main():
         except PEExportError:
             pass
 
-    # Cross-check full 66-export references when a local test DLL is present.
     dll = ROOT / 'bin/binkw32.dll'
     if dll.exists():
         reference = [{'name': x['name'], 'ordinal': x['ordinal']}
-                     for x in json.loads((ROOT / 'docs/exports.json').read_text())]
+                     for x in json.loads((ROOT / 'tools/exports.json').read_text())]
         assert read_exports(dll) == reference
     print('OK: PE32 export parsing, ordinals, MinGW prefix diagnosis, errors')
-
 
 if __name__ == '__main__':
     main()

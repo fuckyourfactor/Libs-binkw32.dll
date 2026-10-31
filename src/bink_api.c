@@ -1,7 +1,3 @@
-/* SPDX-License-Identifier: MIT
- * Partial clean-room reconstruction: uses no code or runtime services from the
- * original Bink DLL. Unsupported features report errors rather than fake success.
- */
 #include "private.h"
 #include "platform.h"
 #include "pixel.h"
@@ -9,11 +5,7 @@
 #include "surface.h"
 #include "trace.h"
 #include <stddef.h>
-/* Exact offsets are recovered from the actual original 2005 Bink 1.8f
- * binkw32.dll, not a newer SDK. The 2005 BinkGetRects routine uses
- * [esi+0x34] for FrameRects and [esi+0xB4] for NumRects; the original
- * BinkCopyToBufferRect accesses [esi+0xB8] (FrameBuffers).
- * These are caller-visible bytes that rFactor relies on. */
+
 _Static_assert(offsetof(BINK, FrameRects) == 52, "Bink 1.8f FrameRects offset");
 _Static_assert(offsetof(BINK, NumRects) == 180, "Bink 1.8f NumRects offset");
 #if defined(_WIN32) && UINTPTR_MAX == UINT32_MAX
@@ -38,11 +30,7 @@ static char *strdup_local(const char *s){size_t n=0;char *p;if(!s)return NULL;wh
 static void *alloc_local(size_t n){if(g_allocator&&g_deallocator)return g_allocator((U32)n);return bk_alloc(n);}
 static uint32_t period_ms(const BINK *b){double t;if(!b||!b->FrameRate)return 0;t=1000.0*(double)b->FrameRateDiv/(double)b->FrameRate;return t>=4294967295.0?UINT32_MAX:(t>=1.0?(uint32_t)t:1);}
 static int valid(HBINK b){return b!=NULL && b->FrameRate>0 && b->Frames>0;}
-/* The public FrameNum is the NEXT frame to decode after BinkNextFrame().
- * rFactor uses DoFrame -> NextFrame -> CopyToBufferRect, and may call Copy
- * repeatedly until the next DoFrame. Do not tie presentation to FrameNum:
- * the RGB buffer owns the last successfully decoded frame.
- * An explicit seek invalidates this frame (see BinkGoto). */
+
 static int has_presentable_frame(const BkHandle *h){
  return h && h->rgb && h->frame_decoded != 0;
 }
@@ -92,8 +80,7 @@ BK_API HBINK BK_CALL BinkOpen(const char *name,U32 flags){
  h->volume=32768;h->pan=32768;h->audio_track=UINT32_MAX;
  if(h->index.tracks && g_sound_count==0)h->audio_track=0;
  else for(U32 selected=0;selected<g_sound_count;selected++){
-  /* BinkSetSoundTrack normally receives zero-based stream indices.
-   * Accept matching stream IDs as a fallback for older integrations. */
+
   U32 wanted=g_sound_tracks[selected];
   if(wanted<h->index.tracks){h->audio_track=wanted;break;}
   for(U32 t=0;t<h->index.tracks;t++)
@@ -107,7 +94,7 @@ BK_API HBINK BK_CALL BinkOpen(const char *name,U32 flags){
  update_frame_sizes(h);
  if(!bk_decoder_open(h,from_memory?NULL:name)){
 #ifdef BINK_WITH_FFMPEG
-  /* Never return a movie handle that is guaranteed to fail at DoFrame. */
+
   error("BinkOpen: FFmpeg could not initialize this Bink video");
   bk_trace("BinkOpen FFmpeg decoder initialization FAILED");
   BinkClose(&h->api);
@@ -138,8 +125,7 @@ BK_API S32 BK_CALL BinkDoFrame(HBINK b){
   const uint8_t *pcm=NULL;U32 size=0;
   uint32_t astart=bk_millis();
   if(!bk_audio_get(h,h->audio_track,b->FrameNum-1,&pcm,&size)){
-   /* An unavailable audio device or malformed audio packet must not prevent
-    * displaying a valid decoded video frame. */
+
    bk_trace("BinkDoFrame audio decode unavailable frame=%u track=%u",b->FrameNum,h->audio_track);
    size=0;
   }
@@ -157,8 +143,7 @@ BK_API S32 BK_CALL BinkDoFrame(HBINK b){
  b->LastFrameNum=b->FrameNum;h->frame_decoded=b->FrameNum;
  h->played++;
  if(b->FrameNum<=3){
-  /* Sample raw decoded pixels, rather than claiming an image was displayed.
-   * The copy/present step belongs to the host and is traced separately. */
+
   U32 sample=0;size_t pixels=(size_t)b->Width*b->Height;
   for(size_t i=0;h->video_enabled && h->rgb && i<pixels && i<1024;i++)
    sample=(sample*33u)^h->rgb[i*4]^((U32)h->rgb[i*4+1]<<8)^((U32)h->rgb[i*4+2]<<16);
@@ -179,8 +164,7 @@ BK_API void BK_CALL BinkGoto(HBINK b,U32 frame,S32 flags){
  b->FrameNum=frame;
  BkHandle *h=HANDLE(b);
  h->next_tick=bk_millis();
- /* A seek must not allow clients to present stale pixels from the old
-  * playback position before BinkDoFrame has decoded the requested image. */
+
  h->frame_decoded=0;b->NumRects=0;
  update_frame_sizes(h);
 }
@@ -209,8 +193,7 @@ BK_API S32 BK_CALL BinkShouldSkip(HBINK b){
 }
 BK_API void BK_CALL BinkService(HBINK b){(void)b;unsupported("BinkService: background IO and audio servicing unavailable");}
 BK_API S32 BK_CALL BinkGetRects(HBINK b,U32 flags){
- /* Bink 1.8f's GetRects returns zero in direct-surface mode.
-  * Surface format bits are not the same as the BinkOpen BINKFROMMEMORY flag. */
+
  if(flags & BINKSURFACEDIRECT){
   bk_trace("BinkGetRects direct surface mode flags=0x%08X result=0", flags);
   return 0;
@@ -227,11 +210,11 @@ BK_API S32 BK_CALL BinkGetRects(HBINK b,U32 flags){
    b->FrameRects[0].Width,b->FrameRects[0].Height);
  return 1;
 }
-/* Portable, bounds-checked surface conversion from a genuinely decoded frame. */
+
 BK_API S32 BK_CALL BinkCopyToBufferRect(HBINK b,void *dst,S32 pitch,U32 dh,U32 dx,U32 dy,U32 sx,U32 sy,U32 sw,U32 sh,U32 flags){
  if(!valid(b)||!dst||!has_presentable_frame(HANDLE(b))){
   error("No decoded frame available");
-  /* Avoid the prior unbounded flood: rFactor may retry Copy every tick. */
+
   if(b && HANDLE(b)->trace_copy_failure_count++ < 12)
    bk_trace("BinkCopyToBufferRect no frame b=%p dst=%p next=%u decoded=%u",(void*)b,dst,
             b->FrameNum,HANDLE(b)->frame_decoded);
@@ -297,7 +280,7 @@ BK_API void BK_CALL BinkGetFrameBuffersInfo(HBINK b,BINKFRAMEBUFFERS *f){
  f->cRcBBufferWidth=(b->Width+1)/2;f->cRcBBufferHeight=(b->Height+1)/2;
 }
 BK_API void BK_CALL BinkRegisterFrameBuffers(HBINK b,BINKFRAMEBUFFERS *f){
- if(!valid(b)||!f)return; /* Bookkeeping only: decoder does not write YUV plane sets. */
+ if(!valid(b)||!f)return;
  b->FrameBuffers=f;unsupported("Registered YUV buffers are not integrated into FFmpeg decoder");
 }
 BK_API S32 BK_CALL BinkSetVideoOnOff(HBINK b,S32 on){if(!valid(b))return 0;S32 prior=(S32)HANDLE(b)->video_enabled;HANDLE(b)->video_enabled=on!=0;return prior;}
@@ -308,7 +291,7 @@ BK_API S32 BK_CALL BinkSetSoundOnOff(HBINK b,S32 on){
 }
 BK_API void BK_CALL BinkSetVolume(HBINK b,U32 t,S32 v){
  if(!valid(b)||t>=(U32)b->NumTracks)return;
- HANDLE(b)->volume=v; /* Gain applied to subsequently queued PCM */
+ HANDLE(b)->volume=v;
 }
 BK_API void BK_CALL BinkSetPan(HBINK b,U32 t,S32 p){
  if(!valid(b)||t>=(U32)b->NumTracks)return;
@@ -332,22 +315,21 @@ BK_API S32 BK_CALL BinkSetSoundSystem(BINKSNDSYSOPEN o,uintptr_t p){
  if(o!=BinkOpenWaveOut && o!=BinkOpenDirectSound && o!=BinkOpenMiles){
   error("Unknown sound system backend");bk_trace("BinkSetSoundSystem unknown backend");return 0;
  }
- /* DirectSound/Miles need not be loaded or initialized by the substitute.
-  * The decoded PCM is routed independently to WinMM WaveOut. */
+
  g_sound_system=o;g_sound_param=p;
  bk_trace("BinkSetSoundSystem accepted backend=%s",o==BinkOpenMiles?"Miles (WaveOut fallback)":o==BinkOpenDirectSound?"DirectSound (WaveOut fallback)":"WaveOut");
  return 1;
 }
 extern S32 BK_CALL bk_sound_waveout_open(BINKSND*,U32,S32,S32,U32,HBINK);
 BK_API BINKSNDOPEN BK_CALL BinkOpenDirectSound(uintptr_t p){
- (void)p; /* Valid callback, backed by WinMM without needing a DirectSound interface. */
+ (void)p;
  return bk_sound_waveout_open;
 }
 BK_API BINKSNDOPEN BK_CALL BinkOpenWaveOut(uintptr_t p){
  (void)p;return bk_sound_waveout_open;
 }
 BK_API BINKSNDOPEN BK_CALL BinkOpenMiles(uintptr_t p){
- (void)p; /* PCM playback uses WinMM, not the proprietary Miles DLL. */
+ (void)p;
  return bk_sound_waveout_open;
 }
 BK_API void BK_CALL BinkGetPalette(void *p){(void)p;unsupported("Palette is not exposed in the RGB backend");}
@@ -355,7 +337,7 @@ BK_API void* BK_CALL BinkLogoAddress(void){unsupported("Embedded proprietary log
 BK_API U32 BK_CALL RADTimerRead(void){
  U32 now=bk_millis();
  if(!g_timer_initialized){g_timer_base=now;g_timer_initialized=1;return 0;}
- return now-g_timer_base; /* approximate milliseconds since first call */
+ return now-g_timer_base;
 }
 BK_API S32 BK_CALL BinkIsSoftwareCursor(void *a,void *b){(void)a;(void)b;unsupported("Software cursor detection unavailable");return 0;}
 BK_API S32 BK_CALL BinkCheckCursor(void *w,S32 x,S32 y,S32 cw,S32 ch){(void)w;(void)x;(void)y;(void)cw;(void)ch;unsupported("Software cursor clipping unavailable");return 0;}
@@ -364,7 +346,7 @@ BK_API S32 BK_CALL BinkDDSurfaceType(void *surface){return bk_dd_surface_type(su
 BK_API S32 BK_CALL BinkDX8SurfaceType(void *surface){return bk_d3d_surface_type(surface);}
 BK_API S32 BK_CALL BinkDX9SurfaceType(void *surface){return bk_d3d_surface_type(surface);}
 BK_API S32 BK_CALL BinkBufferSetDirectDraw(void *dd,void *surface){(void)dd;(void)surface;buffer_error("DirectDraw backing surfaces unsupported");return 0;}
-/* CPU backing buffer is a working independently allocated 32-bit BGRA DIB. */
+
 BK_API HBINKBUFFER BK_CALL BinkBufferOpen(void *window,U32 w,U32 h,U32 flags){
  if(!w||!h||w>7680||h>4800||w>UINT32_MAX/h/4){buffer_error("Invalid surface dimensions");return NULL;}
  if((flags&31u)!=0 && (flags&31u)!=2){buffer_error("Only auto/DIB section surfaces supported");return NULL;}
@@ -411,14 +393,13 @@ BK_API void BK_CALL BinkBufferCheckWinPos(HBINKBUFFER b,S32 *x,S32 *y){
  if(x)*x=b?b->wndx:0;if(y)*y=b?b->wndy:0;
 }
 #ifdef _WIN32
-/* gdi32: StretchDIBits to an existing Win32 window handle */
+
 __declspec(dllimport) void* __stdcall GetDC(void*);
 __declspec(dllimport) int __stdcall ReleaseDC(void*,void*);
 __declspec(dllimport) int __stdcall StretchDIBits(void*,int,int,int,int,int,int,int,int,const void*,const void*,unsigned,int);
 typedef struct {U32 size;S32 width,height;uint16_t planes,bits;U32 compression,sizeimage;S32 xppm,yppm;U32 colors,important;U32 masks[3];} BK_BITMAPINFO;
 #endif
-/* Render only requested dirty rectangles and map each rectangle to its scaled
- * destination coordinates. CPU buffer remains a top-down 32-bit DIB. */
+
 BK_API void BK_CALL BinkBufferBlit(HBINKBUFFER b,BINKRECT *rect,U32 n){
  if(!b||!b->Buffer||!b->wnd)return;
 #ifdef _WIN32

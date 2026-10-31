@@ -1,7 +1,3 @@
-/* SPDX-License-Identifier: MIT
- * Public BINKSND-compatible WinMM adapter; supports WaveOut output without
- * the proprietary Bink audio system. Limited to 16-bit mono/stereo PCM.
- */
 #include "bink32.h"
 #include "audio.h"
 #include "platform.h"
@@ -43,7 +39,7 @@ S32 BK_CALL bk_sound_waveout_open(BINKSND*s,U32 hz,S32 bits,S32 channels,U32 fla
  s->Ready=snd_ready;s->Lock=snd_lock;s->Unlock=snd_unlock;
  s->Volume=snd_volume;s->Pan=snd_pan;s->Pause=snd_pause;
  s->SetOnOff=snd_onoff;s->Close=snd_close;
- s->MixBins=NULL;s->MixBinVols=NULL; /* Unsupported speaker routing is explicit. */
+ s->MixBins=NULL;s->MixBinVols=NULL;
  s->sndbufsize=65536;s->sndbuf=buf;s->sndend=buf+65536;
  s->sndwritepos=buf;s->sndreadpos=buf;s->sndcomp=(uintptr_t)u;
  s->freq=hz;s->bits=bits;s->chans=channels;s->OnOff=1;

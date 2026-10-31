@@ -22,19 +22,14 @@ else()
   list(APPEND BK_SOURCES src/decoder_none.c)
 endif()
 if(WIN32)
-  # 'single' is the nominal GNU public export name. If the linked PE has
-  # exactly one missing/extra prefix underscore, the workflow selects the
-  # alternative and relinks; the final exact-ABI check always runs.
+
   set(BINK_MINGW_PUBLIC_NAME_PREFIX "single" CACHE STRING
       "GNU ld public export prefix (single, double, none)")
   set_property(CACHE BINK_MINGW_PUBLIC_NAME_PREFIX PROPERTY STRINGS single double none)
   if(NOT BINK_MINGW_PUBLIC_NAME_PREFIX MATCHES "^(single|double|none)$")
     message(FATAL_ERROR "Unknown BINK_MINGW_PUBLIC_NAME_PREFIX")
   endif()
-  # The reference .def is written for MSVC/lld-link. GNU ld (MinGW) needs
-  # explicit aliases from the *public* _Func@N names to internal Func@N
-  # (it inserts the internal COFF underscore automatically). Use a generated
-  # .def so both toolchains expose exactly the original 66 decorated exports.
+
   if(MINGW)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     set(BINK_EXPORT_DEF "${CMAKE_CURRENT_BINARY_DIR}/binkw32-mingw.def")
@@ -42,7 +37,7 @@ if(WIN32)
       COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_mingw_def.py"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def"
-        "${CMAKE_CURRENT_SOURCE_DIR}/docs/exports.json"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/exports.json"
         "${BINK_EXPORT_DEF}"
         "--public-prefix" "${BINK_MINGW_PUBLIC_NAME_PREFIX}"
       RESULT_VARIABLE BINK_DEF_RESULT
@@ -55,7 +50,7 @@ if(WIN32)
     message(STATUS "${BINK_DEF_OUTPUT}")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
       "${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def"
-      "${CMAKE_CURRENT_SOURCE_DIR}/docs/exports.json"
+      "${CMAKE_CURRENT_SOURCE_DIR}/tools/exports.json"
       "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_mingw_def.py")
   else()
     set(BINK_EXPORT_DEF "${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def")
@@ -64,7 +59,7 @@ if(WIN32)
   set_target_properties(binkw32 PROPERTIES PREFIX "" OUTPUT_NAME "binkw32")
   target_link_libraries(binkw32 PRIVATE gdi32 user32 kernel32 winmm)
   if(MINGW)
-    # Never permit fuzzy stdcall symbol matching to mask ABI mistakes.
+
     target_link_options(binkw32 PRIVATE "-Wl,--disable-stdcall-fixup")
   endif()
 else()
@@ -76,10 +71,7 @@ target_compile_definitions(binkw32 PRIVATE BINK_BUILD)
 if(BINK_WITH_FFMPEG)
   target_compile_definitions(binkw32 PRIVATE BINK_WITH_FFMPEG=1)
   if(BINK_FFMPEG_STATIC)
-    # FindPkgConfig provides AV_STATIC_LDFLAGS, AV_STATIC_LIBRARIES, etc.
-    # AV_STATIC_LINK_LIBRARIES is NOT a documented output variable: using it
-    # silently omitted ALL FFmpeg archives from the previous link command.
-    # The full --static --libs list preserves the order and Libs.private.
+
     if(NOT AV_STATIC_LDFLAGS)
       message(FATAL_ERROR "pkg-config returned no --static linker flags for FFmpeg")
     endif()
@@ -93,12 +85,9 @@ if(BINK_WITH_FFMPEG)
     if(AV_STATIC_CFLAGS_OTHER)
       target_compile_options(binkw32 PRIVATE ${AV_STATIC_CFLAGS_OTHER})
     endif()
-    # Must be target_link_libraries, NOT target_link_options: MinGW needs
-    # archives AFTER the object files on the link line.
+
     if(WIN32 AND MINGW)
-      # The five static archives have circular/ordering dependencies.
-      # A GNU linker group resolves them even if pkg-config lists avutil
-      # before a codec that later references it.
+
       target_link_libraries(binkw32 PRIVATE
         "-Wl,--start-group" ${AV_STATIC_LDFLAGS} "-Wl,--end-group"
         gdi32 user32 kernel32 winmm)
@@ -118,7 +107,7 @@ if(BINK_BUILD_TESTS)
  add_test(NAME core COMMAND bink_tests)
  find_package(Python3 COMPONENTS Interpreter)
  if(Python3_Interpreter_FOUND)
-   add_test(NAME export_manifest COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_def.py ${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def ${CMAKE_CURRENT_SOURCE_DIR}/docs/exports.json)
+   add_test(NAME export_manifest COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_def.py ${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def ${CMAKE_CURRENT_SOURCE_DIR}/tools/exports.json)
    add_test(NAME mingw_export_aliases COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_mingw_def.py)
    add_test(NAME pe_export_directory COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_pe_exports.py)
    add_test(NAME win32_runtime_imports COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_win32_imports.py)
@@ -150,15 +139,8 @@ if(BINK_BUILD_TESTS)
  add_test(NAME sound_driver_api COMMAND sound_api_tests)
 endif()
 
-# A real-media integration harness. It is not an automated green test:
-# successful decoding requires a legally obtained Bink1 movie and FFmpeg.
-add_executable(bink_probe tools/probe_bink.c)
-target_include_directories(bink_probe PRIVATE include)
-target_link_libraries(bink_probe PRIVATE binkw32)
-
 if(BINK_BUILD_TESTS)
-  # Covers the exact Bink1 rect layout used by legacy 32-bit game hosts and
-  # the critical decode -> GetRects -> CopyToBuffer/Rect handoff.
+
   add_executable(video_api_tests tests/test_video_api.c)
   target_include_directories(video_api_tests PRIVATE include src)
   target_link_libraries(video_api_tests PRIVATE binkw32)

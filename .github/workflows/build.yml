@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     permissions:
-      contents: write # Required only when publishing a tag release
+      contents: write
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -54,7 +54,7 @@ jobs:
             -DBINK_WITH_FFMPEG=ON \
             -DBINK_FFMPEG_STATIC=ON \
             -DBINK_BUILD_TESTS=OFF
-          # Verbose link line exposes missing -lavcodec/-lavformat immediately.
+
           cmake --build build-win32-ffmpeg --target binkw32 --parallel 4 --verbose
 
       - name: Check MinGW export spelling and relink only if necessary
@@ -65,11 +65,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Compare the actual export directory, not objdump's formatted text.
-          # Only a uniform missing/extra leading underscore is eligible for
-          # automatic correction. Everything else is a hard failure.
+
           mode="$(python3 tools/choose_mingw_def.py \
-            docs/exports.json build-win32-ffmpeg/binkw32.dll)"
+            tools/exports.json build-win32-ffmpeg/binkw32.dll)"
           echo "MinGW export name adjustment: $mode"
           if [[ "$mode" != verified ]]; then
             cmake -S . -B build-win32-ffmpeg -G Ninja \
@@ -81,10 +79,9 @@ jobs:
               -DBINK_MINGW_PUBLIC_NAME_PREFIX="$mode"
             cmake --build build-win32-ffmpeg --target binkw32 --parallel 4 --verbose
           fi
-          # This MUST check all 66 exact names and ordinals; never downgrade
-          # this check to a count-only or basename-only comparison.
+
           python3 tools/check_def.py src/binkw32.def \
-            docs/exports.json build-win32-ffmpeg/binkw32.dll
+            tools/exports.json build-win32-ffmpeg/binkw32.dll
 
       - name: Verify PE32, exact exports, static multimedia link, and filename
         run: |
@@ -97,7 +94,6 @@ jobs:
           test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 1
           sha256sum dist/binkw32.dll
 
-      # upload-artifact v7 supports a single file WITHOUT wrapping it in ZIP.
       - name: Downloadable output (exactly binkw32.dll)
         uses: actions/upload-artifact@v7
         with:

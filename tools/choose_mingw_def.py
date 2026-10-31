@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
-"""Recommend the exact MinGW .def export-name spelling after a first link.
 
-Some PE linkers normalize the source-language/COFF leading underscore.  This
-probe inspects the actual PE export names and suggests a different public name
-prefix *only* when all 66 ordinals match, with exactly a one-underscore shift.
-The workflow then RE-LINKS with that .def and rechecks the finished DLL.
-"""
-# SPDX-License-Identifier: MIT
 import json
 from pathlib import Path
 import sys
 from pe_exports import read_exports
-
 
 def recommend(reference, actual):
     if actual == reference:
@@ -23,7 +15,6 @@ def recommend(reference, actual):
         if actual == [{**item, 'name': transform(item['name'])} for item in reference]:
             return candidate
     return None
-
 
 def main():
     if len(sys.argv) != 3:
@@ -38,7 +29,6 @@ def main():
             f'found {len(actual)}. Sample actual exports: {actual[:5]}. '
             'Do not publish this DLL.')
     print(mode)
-
 
 if __name__ == '__main__':
     main()

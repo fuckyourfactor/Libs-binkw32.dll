@@ -18,8 +18,6 @@ unsigned char *bk_load_file(const char *path,size_t *size){
 uint32_t bk_millis(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint32_t)(t.tv_sec*1000u+t.tv_nsec/1000000u);}
 void bk_sleep(uint32_t ms){struct timespec t={(time_t)(ms/1000), (long)((ms%1000)*1000000L)};nanosleep(&t,NULL);}
 
-/* Portable test backend: assumes BINKFROMMEMORY references a valid allocation
- * of the size declared by the Bink header. Windows uses VirtualQuery as well. */
 unsigned char *bk_load_memory(const void *source,size_t *size){
  const uint8_t *p=(const uint8_t*)source;
  if(!p||!size||p[0]!='B'||p[1]!='I'||p[2]!='K')return NULL;

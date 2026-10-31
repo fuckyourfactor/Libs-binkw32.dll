@@ -17,12 +17,12 @@ int main(void){
  assert(i.frames==2&&i.offset[0]==52&&i.offset[1]==56);
  assert(i.key[0]==1&&i.key[1]==1);
  bk_index_free(&i);assert(!bk_parse(movie,32,&i));
- /* This was the rFactor regression: BIKi header ends at byte 44, not 48. */
+
  assert(bk_parse(movie,sizeof(movie),&i));bk_index_free(&i);
- /* Reject frame index pointing inside the index table. */
+
  put32(movie+44,48|1);assert(!bk_parse(movie,sizeof(movie),&i));
  put32(movie+44,52|1);
- /* BIKk has an additional four-byte field after its track count. */
+
  unsigned char newer[56]={0};memcpy(newer,movie,44);newer[3]='k';
  put32(newer+4,48);put32(newer+8,1);put32(newer+48,52|1);
  assert(bk_parse(newer,sizeof(newer),&i));assert(i.offset[0]==52);bk_index_free(&i);
@@ -34,10 +34,9 @@ int main(void){
  assert(BinkGetKeyFrame(b,2,0)==2);
  BinkNextFrame(b);assert(b->FrameNum==2);
  BinkGoto(b,1,0);assert(b->FrameNum==1);
- assert(BinkDoFrame(b)==0); /* invalid test video must NEVER be accepted */
+ assert(BinkDoFrame(b)==0);
  assert(strstr(BinkGetError(),"decoding")!=NULL);
- /* A BinkOpen(..., BINKFROMMEMORY) call has a BIK signature at its
-  * pointer, not a filename; verify it is copied and parsed. */
+
  HBINK memory=BinkOpen((const char*)movie,BINKFROMMEMORY|0x00004000u);
  assert(memory&&memory->Width==2&&memory->Frames==2);
  assert(((BkHandle*)memory)->path==NULL);
@@ -55,17 +54,16 @@ int main(void){
  assert(BinkBufferSetScale(bb,4,4));assert(BinkBufferSetOffset(bb,10,11));
  BinkBufferUnlock(bb);BinkBufferClose(bb);
 
- /* Independently constructed track metadata and per-frame packet boundaries. */
  unsigned char audio_movie[88]={0};
  audio_movie[0]='B';audio_movie[1]='I';audio_movie[2]='K';audio_movie[3]='i';
  put32(audio_movie+4,80);put32(audio_movie+8,2);put32(audio_movie+12,16);
  put32(audio_movie+16,2);put32(audio_movie+20,16);put32(audio_movie+24,8);
  put32(audio_movie+28,24);put32(audio_movie+32,1);put32(audio_movie+40,1);
- put32(audio_movie+44,32); /* declared largest decoded audio block */
- audio_movie[48]=0x22;audio_movie[49]=0x56; /* 22050 Hz */
- audio_movie[50]=0;audio_movie[51]=0x20; /* stereo */
- put32(audio_movie+52,1234); /* public track id */
- put32(audio_movie+56,64|1);put32(audio_movie+60,80); /* second frame not key */
+ put32(audio_movie+44,32);
+ audio_movie[48]=0x22;audio_movie[49]=0x56;
+ audio_movie[50]=0;audio_movie[51]=0x20;
+ put32(audio_movie+52,1234);
+ put32(audio_movie+56,64|1);put32(audio_movie+60,80);
  put32(audio_movie+64,8);put32(audio_movie+68,123);put32(audio_movie+80,0);
  assert(bk_parse(audio_movie,sizeof(audio_movie),&i));
  assert(i.tracks==1&&i.track_ids[0]==1234&&i.track_sizes[0]==32);
@@ -78,7 +76,7 @@ int main(void){
  assert(!bk_packet(&i,3,0,&packet,&packet_bytes));
  FILE *af=fopen("synthetic_audio.bik","wb");assert(af);
  assert(fwrite(audio_movie,1,sizeof(audio_movie),af)==sizeof(audio_movie));fclose(af);
- /* rFactor can select audio by zero-based track index (not stream ID). */
+
  U32 selected_track=0;
  BinkSetSoundTrack(1,&selected_track);
  HBINK ba=BinkOpen("synthetic_audio.bik",0);assert(ba);
@@ -87,7 +85,7 @@ int main(void){
  assert(BinkGetTrackType(ba,0)==0x2000);
  HBINKTRACK bt=BinkOpenTrack(ba,0);assert(bt);
  assert(bt->Frequency==22050&&bt->Channels==2&&bt->Bits==16);
- assert(BinkGetTrackData(bt,NULL)==0); /* audio decode unsupported */
+ assert(BinkGetTrackData(bt,NULL)==0);
  BinkCloseTrack(bt);BinkClose(ba);remove("synthetic_audio.bik");
  BinkSetSoundTrack(0,NULL);
  put32(audio_movie+64,800000);assert(!bk_packet(&i,0,0,&packet,&packet_bytes));

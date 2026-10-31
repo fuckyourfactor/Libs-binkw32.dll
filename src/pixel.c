@@ -1,6 +1,3 @@
-/* SPDX-License-Identifier: MIT
- * Original, portable Bink CPU surface conversion: no proprietary decoder code.
- */
 #include "pixel.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -45,12 +42,12 @@ int bk_pixels_copy(const uint8_t *src,uint32_t w,uint32_t h,void *dst,int32_t pi
    } else {
     uint16_t v;
     switch(fmt){
-     case 7:v=(uint16_t)(((a>>4)<<12)|((r>>4)<<8)|((g>>4)<<4)|(b>>4));break; /* ARGB4444 */
-     case 8:v=(uint16_t)(((r>>3)<<11)|((g>>3)<<6)|((b>>3)<<1)|(a>>7));break; /* RGB5551 */
-     case 9:v=(uint16_t)(((r>>3)<<10)|((g>>3)<<5)|(b>>3));break; /* RGB555 */
-     case 10:v=(uint16_t)(((r>>3)<<11)|((g>>2)<<5)|(b>>3));break; /* RGB565 */
-     case 11:v=(uint16_t)(((r>>2)<<10)|((g>>3)<<5)|(b>>3));break; /* RGB655 */
-     default:v=(uint16_t)(((r>>2)<<10)|((g>>2)<<4)|(b>>4));break; /* RGB664 */
+     case 7:v=(uint16_t)(((a>>4)<<12)|((r>>4)<<8)|((g>>4)<<4)|(b>>4));break;
+     case 8:v=(uint16_t)(((r>>3)<<11)|((g>>3)<<6)|((b>>3)<<1)|(a>>7));break;
+     case 9:v=(uint16_t)(((r>>3)<<10)|((g>>3)<<5)|(b>>3));break;
+     case 10:v=(uint16_t)(((r>>3)<<11)|((g>>2)<<5)|(b>>3));break;
+     case 11:v=(uint16_t)(((r>>2)<<10)|((g>>3)<<5)|(b>>3));break;
+     default:v=(uint16_t)(((r>>2)<<10)|((g>>2)<<4)|(b>>4));break;
     }
     out[x*2]=(uint8_t)v;out[x*2+1]=(uint8_t)(v>>8);
    }

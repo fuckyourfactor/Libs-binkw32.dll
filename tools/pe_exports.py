@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
-"""Read the PE export directory without depending on objdump's text layout.
 
-Only the PE32 fields required for export verification are parsed.  This is
-intentionally strict: truncated/corrupt images fail instead of looking like an
-empty export table.
-"""
-# SPDX-License-Identifier: MIT
 from pathlib import Path
 import struct
 
-
 class PEExportError(ValueError):
     """Invalid, unsupported, or malformed PE export directory."""
-
 
 def read_exports(path: str | Path) -> list[dict[str, int | str]]:
     data = Path(path).read_bytes()
@@ -63,7 +55,7 @@ def read_exports(path: str | Path) -> list[dict[str, int | str]]:
 
     def read_c_string(rva: int) -> str:
         offset = rva_offset(rva, 1)
-        # A PE export name is a nul-terminated ASCII byte string.
+
         end = data.find(b'\x00', offset, min(len(data), offset + 4096))
         if end < 0:
             raise PEExportError(f'Unterminated PE export name at RVA 0x{rva:x}')

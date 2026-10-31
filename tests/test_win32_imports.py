@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Guard against import-check regex errors and shared FFmpeg dependencies.
 
-The end-to-end test uses synthetic PE32 metadata and an objdump substitute.
-It does not contain or load the proprietary DLL or claim codec functionality.
-"""
-# SPDX-License-Identifier: MIT
 import json
 import os
 from pathlib import Path
@@ -14,9 +9,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
-from win32_imports import is_windows_runtime_dll  # noqa: E402
-from test_pe_exports import make_pe  # noqa: E402
-
+from win32_imports import is_windows_runtime_dll
+from test_pe_exports import make_pe
 
 def main():
     for name in (
@@ -34,10 +28,8 @@ def main():
     ):
         assert not is_windows_runtime_dll(name), f'False acceptance: {name}'
 
-    # On POSIX CI, exercise the complete checker, including the code path that
-    # failed after linking FFmpeg. Fake only objdump's imported-DLL listing.
     if os.name != 'nt':
-        manifest = json.loads((ROOT / 'docs/exports.json').read_text(encoding='utf-8'))
+        manifest = json.loads((ROOT / 'tools/exports.json').read_text(encoding='utf-8'))
         with tempfile.TemporaryDirectory() as dirname:
             base = Path(dirname)
             dll = base / 'binkw32.dll'
@@ -69,7 +61,6 @@ def main():
             verify(['KERNEL32.dll', 'avcodec-61.dll'], success=False)
 
     print('OK: valid Windows DLL imports accepted; FFmpeg DLL dependencies rejected')
-
 
 if __name__ == '__main__':
     main()

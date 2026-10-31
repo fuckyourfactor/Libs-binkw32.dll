@@ -1,4 +1,3 @@
-/* No proprietary SDK used. Imports the system's documented Kernel32 APIs. */
 #include "platform.h"
 #define WIN32API __declspec(dllimport)
 extern WIN32API void * __stdcall CreateFileA(const char*,unsigned int,unsigned int,void*,unsigned int,unsigned int,void*);
@@ -6,7 +5,7 @@ extern WIN32API unsigned int __stdcall GetFileSize(void*,unsigned int*);
 extern WIN32API int __stdcall ReadFile(void*,void*,unsigned int,unsigned int*,void*);
 extern WIN32API int __stdcall CloseHandle(void*);
 extern WIN32API unsigned int __stdcall GetTickCount(void);
-/* 32-bit Windows MEMORY_BASIC_INFORMATION, Windows API uses SIZE_T. */
+
 typedef struct BkMemoryRegion {
  void *base, *allocation_base;
  unsigned int allocation_protect;
@@ -18,8 +17,7 @@ extern WIN32API size_t __stdcall VirtualQuery(const void*, BkMemoryRegion*,size_
 #define BK_PAGE_GUARD 0x100u
 #define BK_PAGE_NOACCESS 0x01u
 #define BK_FILE_LIMIT (256u*1024u*1024u)
-/* Test each region before reading. This is a sanity check, not a way to
- * make a hostile/concurrently unmapped address safe against all races. */
+
 static int readable_region(const uint8_t *ptr,size_t len){
  uintptr_t cur=(uintptr_t)ptr;
  if(!ptr||len==0||len>BK_FILE_LIMIT||cur+len<cur)return 0;
