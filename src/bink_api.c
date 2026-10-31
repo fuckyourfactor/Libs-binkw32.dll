@@ -9,14 +9,17 @@
 #include "surface.h"
 #include "trace.h"
 #include <stddef.h>
-/* Enforce the Bink 1 caller-visible prefix on every actual Windows build.
- * rFactor inspects these fields directly; a correct DLL export table is not
- * sufficient if FrameRects / NumRects occupy the wrong byte offsets. */
+/* Exact offsets are recovered from the actual original 2005 Bink 1.8f
+ * binkw32.dll, not a newer SDK. The 2005 BinkGetRects routine uses
+ * [esi+0x34] for FrameRects and [esi+0xB4] for NumRects; the original
+ * BinkCopyToBufferRect accesses [esi+0xB8] (FrameBuffers).
+ * These are caller-visible bytes that rFactor relies on. */
+_Static_assert(offsetof(BINK, FrameRects) == 52, "Bink 1.8f FrameRects offset");
+_Static_assert(offsetof(BINK, NumRects) == 180, "Bink 1.8f NumRects offset");
 #if defined(_WIN32) && UINTPTR_MAX == UINT32_MAX
-_Static_assert(offsetof(BINK, FrameChangePercent) == 52, "Bink 1 FrameChangePercent mismatch");
-_Static_assert(offsetof(BINK, FrameRects) == 56, "Bink 1 FrameRects mismatch");
-_Static_assert(offsetof(BINK, NumRects) == 184, "Bink 1 NumRects mismatch");
-_Static_assert(offsetof(BINK, FrameBuffers) == 188, "Bink 1 FrameBuffers mismatch");
+_Static_assert(offsetof(BINK, FrameBuffers) == 184, "Bink 1.8f FrameBuffers offset");
+_Static_assert(offsetof(BINK, LargestFrameSize) == 212, "Bink 1.8f LargestFrameSize offset");
+_Static_assert(offsetof(BINK, NumTracks) == 220, "Bink 1.8f NumTracks offset");
 #endif
 #define HANDLE(x) ((BkHandle*)(x))
 static char g_error[256];
@@ -121,7 +124,6 @@ BK_API S32 BK_CALL BinkDoFrame(HBINK b){
    error("BinkDoFrame: video decoding failed or unavailable");bk_trace("BinkDoFrame VIDEO FAILED frame=%u",b->FrameNum);return 0;
   }
   h->last_decode_ms=bk_millis()-start;
-  b->FrameChangePercent=100; /* full-frame output: conservative dirty estimate */
   b->NumRects=1;b->FrameRects[0]=(BINKRECT){0,0,(S32)b->Width,(S32)b->Height};
  } else b->NumRects=0;
  if(h->sound_enabled && h->audio_track!=UINT32_MAX && g_sound_system){
@@ -193,14 +195,21 @@ BK_API S32 BK_CALL BinkShouldSkip(HBINK b){
 }
 BK_API void BK_CALL BinkService(HBINK b){(void)b;unsupported("BinkService: background IO and audio servicing unavailable");}
 BK_API S32 BK_CALL BinkGetRects(HBINK b,U32 flags){
+ /* Bink 1.8f's GetRects returns zero in direct-surface mode.
+  * Surface format bits are not the same as the BinkOpen BINKFROMMEMORY flag. */
+ if(flags & BINKSURFACEDIRECT){
+  bk_trace("BinkGetRects direct surface mode flags=0x%08X result=0", flags);
+  return 0;
+ }
  if(!valid(b)||HANDLE(b)->frame_decoded!=b->FrameNum){
   bk_trace("BinkGetRects no decoded frame current=%u decoded=%u flags=0x%08X",
            b?b->FrameNum:0,b?HANDLE(b)->frame_decoded:0,flags);
   return 0;
  }
  b->NumRects=1;b->FrameRects[0]=(BINKRECT){0,0,(S32)b->Width,(S32)b->Height};
- if(b->FrameNum<=3)bk_trace("BinkGetRects frame=%u format=0x%08X rect=(%d,%d,%d,%d)",
-   b->FrameNum,flags,b->FrameRects[0].Left,b->FrameRects[0].Top,
+ if(HANDLE(b)->trace_rect_count++<12)
+  bk_trace("BinkGetRects OK frame=%u flags=0x%08X count=%d rect=(%d,%d,%d,%d)",
+   b->FrameNum,flags,b->NumRects,b->FrameRects[0].Left,b->FrameRects[0].Top,
    b->FrameRects[0].Width,b->FrameRects[0].Height);
  return 1;
 }
@@ -215,7 +224,8 @@ BK_API S32 BK_CALL BinkCopyToBufferRect(HBINK b,void *dst,S32 pitch,U32 dh,U32 d
  if(!bk_pixels_copy(HANDLE(b)->rgb,b->Width,b->Height,dst,pitch,dh,dx,dy,sx,sy,sw,sh,flags)){
   error("Invalid surface, stride, rectangle, or unsupported format");bk_trace("BinkCopyToBufferRect FAILED frame=%u flags=0x%08X pitch=%d dstheight=%u dst=(%u,%u) src=(%u,%u %ux%u)",b->FrameNum,flags,pitch,dh,dx,dy,sx,sy,sw,sh);return 0;
  }
- if(b->FrameNum<=3)bk_trace("BinkCopyToBufferRect OK frame=%u flags=0x%08X pitch=%d dstheight=%u dst=(%u,%u) src=(%u,%u %ux%u)",b->FrameNum,flags,pitch,dh,dx,dy,sx,sy,sw,sh);
+ if(HANDLE(b)->trace_copy_count++<12)
+  bk_trace("BinkCopyToBufferRect OK frame=%u flags=0x%08X pitch=%d dstheight=%u dst=(%u,%u) src=(%u,%u %ux%u)",b->FrameNum,flags,pitch,dh,dx,dy,sx,sy,sw,sh);
  return 1;
 }
 BK_API S32 BK_CALL BinkCopyToBuffer(HBINK b,void *dst,S32 pitch,U32 h,U32 x,U32 y,U32 flags){

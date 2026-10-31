@@ -24,7 +24,7 @@
 | 18 | `_BinkControlBackgroundIO@8` | NO | No se implementa hilo de IO |
 | 19 | `_BinkControlPlatformFeatures@8` | NO | Máscaras de CPU sin implementación |
 | 20 | `_BinkCopyToBuffer@28` | PENDIENTE | Copia BGRA decodificado; nueva prueba de integración API; uso en rFactor aún no validado tras el ajuste ABI |
-| 21 | `_BinkCopyToBufferRect@44` | PENDIENTE | Copia de rectángulos; corregido offset de FrameRects (+4); pruebas con imagen sintética |
+| 21 | `_BinkCopyToBufferRect@44` | PENDIENTE | Copia de rectángulos; corregido FrameRects al offset +52 real de Bink 1.8f; pruebas con imagen sintética |
 | 22 | `_BinkDDSurfaceType@4` | NO | Introspección de superficies DirectDraw no implementada |
 | 23 | `_BinkDX8SurfaceType@4` | NO | Mapeo Direct3D8 no implementado |
 | 24 | `_BinkDX9SurfaceType@4` | NO | Mapeo Direct3D9 no implementado |

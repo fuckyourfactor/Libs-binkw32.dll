@@ -2,28 +2,45 @@
 
 **No es todavía un reemplazo 100% compatible ni una DLL con compatibilidad de reproducción verificada en rFactor.** Este proyecto busca interoperabilidad con el binario Win32 x86 proporcionado (Bink 1, año 2005). El código original de este repositorio es MIT y **no carga ni redirige a la DLL propietaria**. La ruta multimedia utiliza el proyecto abierto FFmpeg, con sus propias dependencias y licencias LGPL/GPL según la configuración.
 
-## Corrección rFactor: audio presente, vídeo invisible (31 oct 2026)
+## Corrección rFactor: ABI verificada contra la DLL original de 2005
 
-El juego ahora abre y decodifica `ISILOGO.BIK`, `PREGAME.BIK` y el vídeo de
-`RFM`, y el audio se escucha. Sin embargo, el prefijo público de la estructura
-`BINK` de esta implementación omitía un **U32 FrameChangePercent** después de
-`SndSize` (offset `0x34`). Esto desplazaba `FrameRects[0]` de su offset ABI
-correcto `0x38` a `0x34` y también `NumRects` de `0xB8` a `0xB4`.
+**Se corrigió un error de la versión anterior del proyecto.** La actualización
+previa añadió `FrameChangePercent` entre `SndSize` y `FrameRects` basándose en
+una cabecera de un SDK diferente. Esa estructura **no corresponde a la DLL
+original Bink 1.8f** suministrada para rFactor y dejaba desalineado el acceso
+del juego a los rectángulos.
 
-En un host que lee los rectángulos directamente de `HBINK`, el primer
-rectángulo podía verse como (0, ancho, alto, 0): altura cero, por lo que no se
-presentaba la imagen aunque `BinkDoFrame` devolviese éxito. Se ha restaurado
-el campo y alineado el siguiente prefijo público de Bink 1. Hay aserciones de
-compilación de offsets Win32 y una prueba `video_api_abi_and_copy` que simula
-la lectura de los rectángulos desde el host, `BinkGetRects` y
-`BinkCopyToBuffer/Rect`.
+El desensamblado de la DLL original aporta evidencia directa:
 
-La variable `BINK_OPEN_TRACE` ahora muestra para los primeros fotogramas
-`rgb_sample`, `BinkGetRects` y `BinkCopyToBufferRect OK/FAILED`, para
-identificar si el bloqueo se produce al decodificar o durante la copia.
-`BinkDoFrame` **no dibuja en pantalla por sí solo**: la aplicación receptora
-copia los píxeles a su propia textura o superficie y la presenta. Esta versión
-no se ha ejecutado en Windows con rFactor ni con sus archivos multimedia.
+| Campo de `BINK` | Acceso comprobado en el original | Offset decimal |
+| --- | --- | ---: |
+| `FrameRects[0]` | `BinkGetRects`, RVA `0xD190`, `esi+0x34` | 52 |
+| `NumRects` | `BinkGetRects`, RVA `0xD190`, `esi+0xB4` | 180 |
+| `FrameBuffers` | `BinkCopyToBufferRect`, RVA `0xB670`, `esi+0xB8` | 184 |
+
+Se retiró el campo introducido incorrectamente, se restauraron los offsets,
+y se añadieron aserciones ABI y pruebas de copia que validan la lectura de
+`BINKRECT` en los desplazamientos que utiliza el Bink original. `BinkGetRects`
+también respeta la devolución de cero para `BINKSURFACEDIRECT`, comportamiento
+observado en el original.
+
+`tools/audit_original_2005.py` puede reproducir el análisis sobre los
+**binarios legítimos que ya tengas localmente**, sin incluirlos en el proyecto:
+
+```bash
+python3 tools/audit_original_2005.py /ruta/a/binkw32.dll /ruta/a/rFactor.exe
+```
+
+La variable `BINK_OPEN_TRACE` registra los primeros 12 usos efectivos de
+`BinkGetRects` y `BinkCopyToBufferRect`, aunque ocurran después del tercer
+fotograma. `BinkDoFrame` decodifica pero **no presenta** los píxeles en la
+ventana por sí solo: la presentación final depende del código del juego.
+
+**Verificado aquí:** las posiciones de la DLL original mediante desensamblado,
+las 16 importaciones de `rFactor.exe`, los tests unitarios y una compilación
+Win32 **sin FFmpeg** con todas las exportaciones. **Pendiente:** ejecutar la
+DLL con FFmpeg y comprobar visualmente rFactor en Windows. No debe declararse
+que el fallo de visualización esté resuelto hasta esa prueba real.
 
 ## Corrección rFactor: Bink 1 y reproducción desde memoria
 

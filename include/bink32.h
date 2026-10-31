@@ -26,10 +26,10 @@ typedef struct BINKFRAMEBUFFERS {
 typedef struct BINK {
  U32 Width,Height,Frames,FrameNum,LastFrameNum,FrameRate,FrameRateDiv,ReadError,OpenFlags;
  U32 BinkType,Size,FrameSize,SndSize;
- /* Bink 1 public ABI: this U32 is BETWEEN SndSize and FrameRects.
-  * Missing it shifts every dirty rectangle and makes the host see a
-  * zero-height first rectangle (invisible video despite decoded audio). */
- U32 FrameChangePercent;
+ /* Observed in the original Bink 1.8f (2005) binary:
+  * BinkGetRects accesses FrameRects at +0x34 and NumRects at +0xB4.
+  * IMPORTANT: This particular binary has no FrameChangePercent here.
+  * Other Bink SDK revisions use incompatible layouts. */
  BINKRECT FrameRects[8];
  S32 NumRects;
  BINKFRAMEBUFFERS *FrameBuffers;
@@ -118,6 +118,9 @@ typedef void *(BK_CALL *BINKIOOPEN)(void *);
 #define BINKSURFACEYUY2 13
 #define BINKSURFACEUYVY 14
 #define BINKFROMMEMORY 0x04000000u
+#define BINKSURFACEDIRECT 0x04000000u
+#define BINKSURFACESLOW 0x08000000u
+#define BINKCOPYALL 0x80000000u
 #define BINKGETKEYPREVIOUS 0
 #define BINKGETKEYNEXT 1
 #define BINKGETKEYCLOSEST 2

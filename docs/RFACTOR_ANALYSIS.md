@@ -103,32 +103,59 @@ Pruebas nuevas: `BIKi` con la tabla en su desplazamiento correcto,
 El código FFmpeg nuevo debe validarse en GitHub Actions y con películas reales
 para comprobar que la reproducción final en rFactor ya funcione.
 
-## rFactor: sonido correcto y vídeo invisible — diagnóstico ABI (31 oct 2026)
+## Corrección ABI: vídeo invisible (análisis directo de la DLL original)
 
-En el log recibido los vídeos `ISILOGO.BIK` (600×450) y `PREGAME.BIK`
-(512×384), así como `RFM\SRGRANDPRIX05.BIK` (800×336), se abren y el
-bucle decodifica fotogramas. Sin embargo, el registro no contiene ninguna
-confirmación de llamadas `BinkCopyToBuffer` o `BinkCopyToBufferRect`; las
-versiones anteriores solo registraban errores de copia, no éxitos.
+La actualización anterior de este proyecto era **incorrecta**: usó la
+estructura de una variante del SDK Bink en vez de verificar los desplazamientos
+en `binkw32.dll` de **2005, Bink 1.8f**. En concreto, añadió
+`FrameChangePercent` después de `SndSize` y desplazó cuatro bytes los campos
+que rFactor puede leer directamente a través de `HBINK`.
 
-Se contrastó el prefijo de `BINK` con una definición pública del SDK Bink 1
-(`SourceEngine2007/src_main/deps/bink/bink.h`, alojada en GitHub). El código
-anterior omitía `FrameChangePercent` en offset 52. Resultado: en la
-estructura anterior `FrameRects` comenzaba en byte 52 y `NumRects` en 180,
-mientras que los offsets de la API pública Bink 1 son 56 y 184. Los lectores
-del host pueden interpretar un rectángulo de altura cero. Se añadió el campo
-y se corrigió el desplazamiento posterior de punteros de planos/contadores
-sin copiar implementación propietaria.
+### Evidencia del original, no inferencia de SDK genérica
 
-Ahora se registran (solo si BINK_OPEN_TRACE está activada):
+En el desensamblado de la DLL original proporcionada:
 
-- `BinkDoFrame decoded ... rgb_sample=... rect=(0,0,W,H)`: decodificación y
-  contenido RGB muestreado (una muestra igual a cero no demuestra fallo).
-- `BinkGetRects frame=... format=... rect=...`: lectura del rectángulo.
-- `BinkCopyToBufferRect OK/FAILED ... flags=... pitch=...`: confirmación
-  de la transferencia a la superficie de la aplicación.
+- `BinkGetRects` (RVA `0xD190`) usa `lea edi,[esi+0x34]`, la dirección
+  de `FrameRects[0]` relativa al puntero `HBINK`.
+- La misma función usa `cmp dword ptr [esi+0xB4],-1`, así como
+  `mov eax,[esi+0xB4]` al devolver el recuento: **`NumRects` está en 180**.
+- `BinkCopyToBufferRect` (RVA `0xB670`) accede a `[esi+0xB8]` como
+  puntero a `FrameBuffers`: **offset 184**.
+- `BinkGetRects` devuelve 0 cuando los flags incluyen `0x04000000`
+  (`BINKSURFACEDIRECT`); se refleja esta rama comprobada.
 
-No se modificó `rFactor.exe`. No se dispone aquí de un entorno Windows con
-rFactor y archivos `.bik` reales para confirmar la imagen visible. La
-compatibilidad PE32 y las nuevas pruebas unitarias constituyen evidencia
-parcial; el resultado final depende de probarlo en el juego.
+El cambio elimina el `FrameChangePercent` que no pertenece a este prefijo de
+Bink 1.8f y restaura `FrameRects=52`, `NumRects=180`, `FrameBuffers=184`.
+Las nuevas aserciones de compilación se aplican sobre la ABI de 32 bits y
+hay pruebas de presentación para los desplazamientos reales. Esta diferencia
+**sí es reproducible** con la DLL original, aunque el modo exacto en que
+rFactor utiliza esos campos todavía no se observó durante una ejecución
+con depurador.
+
+### Límites del análisis del ejecutable
+
+Las 16 importaciones Bink del ejecutable están enumeradas arriba e incluyen
+`BinkGetRects`, `BinkCopyToBuffer`, `BinkCopyToBufferRect` y `BinkDoFrame`.
+La sección `.text` del `rFactor.exe` aportado presenta una entropía de casi
+8 bits/byte, indicativa de empaquetado/ofuscación: el desensamblado directo
+de esa sección no proporciona un grafo de llamadas fiable en disco.
+No se afirma haber reconstruido qué ruta gráfica sigue rFactor en tiempo
+real. La prueba concluyente será registrar las llamadas de presentación en
+Windows con los archivos `.BIK` reales.
+
+### Diagnóstico disponible
+
+`BINK_OPEN_TRACE` registra los primeros 12 `BinkGetRects` y
+`BinkCopyToBufferRect` exitosos por película, independientemente de cuándo
+se produzcan, además de fallos. Esto permite distinguir entre fallo de
+conversión de píxeles y ausencia de llamadas del host.
+
+El comprobador opcional `tools/audit_original_2005.py` contrasta los offsets
+observados con tu DLL original y la tabla de importaciones con tu rFactor:
+
+```
+python3 tools/audit_original_2005.py binkw32-original.dll rFactor.exe
+```
+
+**Estado:** verificados ABI y pruebas de copia con datos sintéticos, y compilada
+la DLL Win32 sin FFmpeg; pendiente de validar vídeo real en rFactor/Windows.
