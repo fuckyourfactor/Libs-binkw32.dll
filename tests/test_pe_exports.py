@@ -22,7 +22,7 @@ def make_pe(exports):
     `exports` is a list of (name, ordinal); no actual executable code is
     needed for inspecting the metadata.
     """
-    data = bytearray(4096)
+    data = bytearray(0x5000)
     data[:2] = b'MZ'
     struct.pack_into('<I', data, 0x3c, 0x80)
     data[0x80:0x84] = b'PE\0\0'
@@ -30,15 +30,15 @@ def make_pe(exports):
     opt = 0x98
     struct.pack_into('<H', data, opt, 0x10b)
     struct.pack_into('<I', data, opt + 92, 16)
-    struct.pack_into('<II', data, opt + 96, 0x1000, 0x600)
+    struct.pack_into('<II', data, opt + 96, 0x1000, 0x2800)
     section = opt + 0xe0
     data[section:section + 8] = b'.edata\0\0'
-    struct.pack_into('<IIII', data, section + 8, 0x600, 0x1000, 0x600, 0x200)
+    struct.pack_into('<IIII', data, section + 8, 0x3000, 0x1000, 0x3000, 0x200)
     ordinal_base = min(x[1] for x in exports)
     funcs = 0x1100
-    names_rva = 0x1200
-    ordinals = 0x1300
-    str_rva = 0x1400
+    names_rva = 0x1300
+    ordinals = 0x1500
+    str_rva = 0x1600
 
     def write(rva, fmt, *args):
         struct.pack_into(fmt, data, 0x200 + rva - 0x1000, *args)

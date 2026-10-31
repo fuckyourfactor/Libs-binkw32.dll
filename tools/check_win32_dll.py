@@ -4,6 +4,7 @@
 import argparse
 from pathlib import Path
 import re
+from win32_imports import is_windows_runtime_dll
 import subprocess
 import sys
 
@@ -52,9 +53,7 @@ if args.require_static_ffmpeg:
     for option in ('BINK_WITH_FFMPEG:BOOL=ON', 'BINK_FFMPEG_STATIC:BOOL=ON'):
         if option not in cache:
             parser.error(f'FFmpeg build not enabled: {option}')
-    non_system = [name for name in imports if not re.fullmatch(
-        r'(?:api-ms-win-[\w-]+|ext-ms-[\w-]+|(?:kernel32|user32|gdi32|winmm|msvcrt|ucrtbase|advapi32|bcrypt|ws2_32|secur32|ole32|shell32|ntdll|shlwapi|version|crypt32|rpcrt4|kernelbase)\.dll',
-        name, re.I)]
+    non_system = [name for name in imports if not is_windows_runtime_dll(name)]
     if non_system:
         parser.error('Unexpected runtime DLL dependencies: ' + ', '.join(non_system))
 

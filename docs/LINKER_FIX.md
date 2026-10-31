@@ -76,3 +76,30 @@ Solución implementada:
 contra la DLL de referencia y contra el binario anterior (66/66). **No
 verificado:** el resultado de la recompilación real con FFmpeg/MinGW en el
 runner remoto; el workflow debe confirmarlo antes de publicar su artefacto.
+
+## Tercer arreglo: verificación de importaciones estáticas en CI
+
+Después de enlazar `binkw32.dll`, el verificador de PE32 aceptó sus 66
+exportaciones, pero `tools/check_win32_dll.py` se detuvo con
+`re.error: missing ), unterminated subpattern at position 0` al clasificar
+los nombres `DLL Name:` obtenidos de `objdump -p`. La expresión regular
+contenía un grupo `(?:` que no se cerraba.
+
+El verificador ahora delega en `tools/win32_imports.py`, que combina un
+conjunto explícito de DLL del sistema Windows con una expresión regular
+pequeña y válida para los contratos `api-ms-win-*` / `ext-ms-*`. Se sigue
+rechazando la importación dinámica de `avcodec-*.dll`, `avformat-*.dll` y
+otras dependencias ajenas a Windows. La validación **no se elimina ni
+se omite** para pasar el workflow.
+
+`tests/test_win32_imports.py` comprueba la clasificación y ejecuta el
+verificador completo sobre un PE32 sintético con 66 exportaciones,
+simulando la salida de `objdump`. Una segunda prueba asegura que una
+importación dinámica de FFmpeg se detecta como error. No se requiere ni
+se distribuye la DLL propietaria para ejecutar estas pruebas.
+
+**Pruebas efectuadas localmente:** 9/9 `ctest`; ejecución completa del
+verificador contra la DLL original proporcionada en la conversación,
+con 66 exportaciones y 4 importaciones del sistema reconocidas.
+**Pendiente:** ejecutar otra vez GitHub Actions para comprobar el PE32
+nuevo construido con FFmpeg y su lista real de importaciones.

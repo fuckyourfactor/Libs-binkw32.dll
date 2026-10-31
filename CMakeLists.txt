@@ -120,6 +120,7 @@ if(BINK_BUILD_TESTS)
    add_test(NAME export_manifest COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_def.py ${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def ${CMAKE_CURRENT_SOURCE_DIR}/docs/exports.json)
    add_test(NAME mingw_export_aliases COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_mingw_def.py)
    add_test(NAME pe_export_directory COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_pe_exports.py)
+   add_test(NAME win32_runtime_imports COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_win32_imports.py)
  endif()
 endif()
 

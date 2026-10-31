@@ -182,3 +182,13 @@ Este programa recorre los fotogramas, calcula un checksum FNV1a del BGRA realmen
 - FFmpeg: https://ffmpeg.org/legal.html (sus licencias se aplican por separado).
 - Especificación pública / implementación FFmpeg: https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/bink.c y https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/binkaudio.c
 - Las interfaces multimedia Win32 utilizadas están documentadas públicamente por Microsoft.
+
+### Corrección del validador de DLL en GitHub Actions (octubre de 2026)
+
+Si GitHub Actions termina el enlace pero falla en `check_win32_dll.py`
+con `re.error: missing ), unterminated subpattern`, actualiza el proyecto:
+la detección de importaciones permitidas utiliza ahora `tools/win32_imports.py`
+y una prueba de regresión `tests/test_win32_imports.py`. El workflow
+`.github/workflows/build.yml` mantiene la comprobación estricta de las 66
+exportaciones y exige que FFmpeg esté enlazado estáticamente (sin importar
+bibliotecas `avcodec-*.dll`, etc.). El resultado sigue siendo `binkw32.dll`.
