@@ -2,6 +2,29 @@
 
 **No es todavía un reemplazo 100% compatible ni una DLL con compatibilidad de reproducción verificada en rFactor.** Este proyecto busca interoperabilidad con el binario Win32 x86 proporcionado (Bink 1, año 2005). El código original de este repositorio es MIT y **no carga ni redirige a la DLL propietaria**. La ruta multimedia utiliza el proyecto abierto FFmpeg, con sus propias dependencias y licencias LGPL/GPL según la configuración.
 
+## Corrección rFactor: audio presente, vídeo invisible (31 oct 2026)
+
+El juego ahora abre y decodifica `ISILOGO.BIK`, `PREGAME.BIK` y el vídeo de
+`RFM`, y el audio se escucha. Sin embargo, el prefijo público de la estructura
+`BINK` de esta implementación omitía un **U32 FrameChangePercent** después de
+`SndSize` (offset `0x34`). Esto desplazaba `FrameRects[0]` de su offset ABI
+correcto `0x38` a `0x34` y también `NumRects` de `0xB8` a `0xB4`.
+
+En un host que lee los rectángulos directamente de `HBINK`, el primer
+rectángulo podía verse como (0, ancho, alto, 0): altura cero, por lo que no se
+presentaba la imagen aunque `BinkDoFrame` devolviese éxito. Se ha restaurado
+el campo y alineado el siguiente prefijo público de Bink 1. Hay aserciones de
+compilación de offsets Win32 y una prueba `video_api_abi_and_copy` que simula
+la lectura de los rectángulos desde el host, `BinkGetRects` y
+`BinkCopyToBuffer/Rect`.
+
+La variable `BINK_OPEN_TRACE` ahora muestra para los primeros fotogramas
+`rgb_sample`, `BinkGetRects` y `BinkCopyToBufferRect OK/FAILED`, para
+identificar si el bloqueo se produce al decodificar o durante la copia.
+`BinkDoFrame` **no dibuja en pantalla por sí solo**: la aplicación receptora
+copia los píxeles a su propia textura o superficie y la presenta. Esta versión
+no se ha ejecutado en Windows con rFactor ni con sus archivos multimedia.
+
 ## Corrección rFactor: Bink 1 y reproducción desde memoria
 
 La revisión de `bink-open.log` encontró un fallo del parser en `src/container.c`:
@@ -83,13 +106,13 @@ python3 tools/check_win32_dll.py build-win32-ffmpeg/binkw32.dll \
 
 Resultado: `build-win32-ffmpeg/binkw32.dll`. El workflow copia únicamente ese archivo a `dist/`.
 
-**Nivel de verificación:** los ocho tests nativos pasan y se ha validado la
+**Nivel de verificación:** los diez tests nativos pasan y se ha validado la
 exportación PE32 de los 66 nombres/ordinales con un enlazador COFF mediante
 un programa de pruebas independiente. También se comprobó la presencia de
 `-lavformat`, `-lavcodec`, `-lavutil`, `-lswscale`, `-lswresample` y
 `Libs.private` en la línea de enlace CMake usando archivos pkg-config de
-prueba. **No se ha podido repetir aquí el trabajo remoto completo con las
-bibliotecas FFmpeg Win32 reales**: debe verificarse con el workflow en GitHub.
+prueba. **No se ha podido repetir localmente el trabajo remoto completo con las
+bibliotecas FFmpeg Win32 reales**; el registro del usuario confirma una DLL compilada que ejecuta decodificación con sonido.
 Tampoco se ha probado decodificación con Bink real ni compatibilidad con rFactor. La salida sin FFmpeg de versiones anteriores **no debe confundirse con esta nueva compilación**.
 
 **Licencias:** el código de este proyecto es MIT; la distribución del binario que incorpora FFmpeg enlazado estáticamente debe respetar también las obligaciones **LGPL** de FFmpeg, incluyendo los avisos, disponibilidad del código fuente de FFmpeg y la posibilidad de modificar y volver a enlazar la biblioteca. El workflow no habilita componentes GPL o no libres. Consulta https://ffmpeg.org/legal.html antes de distribuir el binario.
@@ -102,8 +125,8 @@ Tampoco se ha probado decodificación con Bink real ni compatibilidad con rFacto
 |---|---|---|
 | PE32 x86 / exportaciones | `.def` con 66 exportaciones decoradas y ordinales | **66/66** coinciden con la muestra en un PE32 compilado |
 | Metadatos Bink 1 | Índice, pistas, keyframes, cabeceras | Pruebas unitarias con contenedores sintéticos |
-| Vídeo Bink 1 | FFmpeg (`libavformat` + `libavcodec`) opcional, BGRA (`libswscale`) | **No compilado ni probado** con un archivo `.bik` real |
-| Audio Bink DCT / RDFT | FFmpeg (`libavcodec` + `libswresample`) opcional: PCM16 por pista/fotograma | **No compilado ni probado** contra Bink real |
+| Vídeo Bink 1 | FFmpeg (`libavformat` + `libavcodec`) opcional, BGRA (`libswscale`) | El usuario confirma que rFactor decodifica fotogramas; salida en pantalla aún pendiente de verificar tras la corrección del ABI |
+| Audio Bink DCT / RDFT | FFmpeg (`libavcodec` + `libswresample`) opcional: PCM16 por pista/fotograma | El usuario confirma audio audible en rFactor; no se han ejecutado pruebas locales con `.bik` real |
 | WaveOut | Cola de 16 buffers WinMM, pausa, control de ganancia y balance, adaptador `BINKSND` | Código Win32 compilado, **sin prueba de reproducción en Windows** |
 | Superficies RGB/YUV | RGB24/32, 4444, 5551, 555, 565, 655, 664, YUY2, UYVY | Pruebas de conversión CPU; requiere imagen decodificada |
 | DirectDraw / Direct3D8/9 | Consulta COM de formatos de superficie conocidos | Prueba mediante interfaces COM simuladas; **sin pruebas GPU reales** |

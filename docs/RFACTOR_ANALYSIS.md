@@ -102,3 +102,33 @@ Pruebas nuevas: `BIKi` con la tabla en su desplazamiento correcto,
 `BINKFROMMEMORY | BINKSNDTRACK` sin invocar rutas del sistema.
 El código FFmpeg nuevo debe validarse en GitHub Actions y con películas reales
 para comprobar que la reproducción final en rFactor ya funcione.
+
+## rFactor: sonido correcto y vídeo invisible — diagnóstico ABI (31 oct 2026)
+
+En el log recibido los vídeos `ISILOGO.BIK` (600×450) y `PREGAME.BIK`
+(512×384), así como `RFM\SRGRANDPRIX05.BIK` (800×336), se abren y el
+bucle decodifica fotogramas. Sin embargo, el registro no contiene ninguna
+confirmación de llamadas `BinkCopyToBuffer` o `BinkCopyToBufferRect`; las
+versiones anteriores solo registraban errores de copia, no éxitos.
+
+Se contrastó el prefijo de `BINK` con una definición pública del SDK Bink 1
+(`SourceEngine2007/src_main/deps/bink/bink.h`, alojada en GitHub). El código
+anterior omitía `FrameChangePercent` en offset 52. Resultado: en la
+estructura anterior `FrameRects` comenzaba en byte 52 y `NumRects` en 180,
+mientras que los offsets de la API pública Bink 1 son 56 y 184. Los lectores
+del host pueden interpretar un rectángulo de altura cero. Se añadió el campo
+y se corrigió el desplazamiento posterior de punteros de planos/contadores
+sin copiar implementación propietaria.
+
+Ahora se registran (solo si BINK_OPEN_TRACE está activada):
+
+- `BinkDoFrame decoded ... rgb_sample=... rect=(0,0,W,H)`: decodificación y
+  contenido RGB muestreado (una muestra igual a cero no demuestra fallo).
+- `BinkGetRects frame=... format=... rect=...`: lectura del rectángulo.
+- `BinkCopyToBufferRect OK/FAILED ... flags=... pitch=...`: confirmación
+  de la transferencia a la superficie de la aplicación.
+
+No se modificó `rFactor.exe`. No se dispone aquí de un entorno Windows con
+rFactor y archivos `.bik` reales para confirmar la imagen visible. La
+compatibilidad PE32 y las nuevas pruebas unitarias constituyen evidencia
+parcial; el resultado final depende de probarlo en el juego.

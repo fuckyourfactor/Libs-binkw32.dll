@@ -155,3 +155,12 @@ endif()
 add_executable(bink_probe tools/probe_bink.c)
 target_include_directories(bink_probe PRIVATE include)
 target_link_libraries(bink_probe PRIVATE binkw32)
+
+if(BINK_BUILD_TESTS)
+  # Covers the exact Bink1 rect layout used by legacy 32-bit game hosts and
+  # the critical decode -> GetRects -> CopyToBuffer/Rect handoff.
+  add_executable(video_api_tests tests/test_video_api.c)
+  target_include_directories(video_api_tests PRIVATE include src)
+  target_link_libraries(video_api_tests PRIVATE binkw32)
+  add_test(NAME video_api_abi_and_copy COMMAND video_api_tests)
+endif()

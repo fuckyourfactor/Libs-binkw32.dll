@@ -26,11 +26,17 @@ typedef struct BINKFRAMEBUFFERS {
 typedef struct BINK {
  U32 Width,Height,Frames,FrameNum,LastFrameNum,FrameRate,FrameRateDiv,ReadError,OpenFlags;
  U32 BinkType,Size,FrameSize,SndSize;
+ /* Bink 1 public ABI: this U32 is BETWEEN SndSize and FrameRects.
+  * Missing it shifts every dirty rectangle and makes the host see a
+  * zero-height first rectangle (invisible video despite decoded audio). */
+ U32 FrameChangePercent;
  BINKRECT FrameRects[8];
  S32 NumRects;
  BINKFRAMEBUFFERS *FrameBuffers;
  void *MaskPlane;
- U32 MaskPitch,MaskLength,LargestFrameSize,InternalFrames;
+ U32 MaskPitch,MaskLength;
+ void *AsyncMaskPlane,*InUseMaskPlane,*LastMaskPlane;
+ U32 LargestFrameSize,InternalFrames;
  S32 NumTracks;
  U32 Highest1SecRate,Highest1SecFrame;
  S32 Paused;

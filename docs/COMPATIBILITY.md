@@ -23,12 +23,12 @@
 | 17 | `_BinkCloseTrack@4` | PARCIAL | Libera objeto de pista; no dispositivo de audio |
 | 18 | `_BinkControlBackgroundIO@8` | NO | No se implementa hilo de IO |
 | 19 | `_BinkControlPlatformFeatures@8` | NO | Máscaras de CPU sin implementación |
-| 20 | `_BinkCopyToBuffer@28` | PENDIENTE | Copia BGRA decodificado a superficies RGB 24/32; sin prueba con vídeo real |
-| 21 | `_BinkCopyToBufferRect@44` | PENDIENTE | Copia de rectángulos RGB 24/32; sin prueba sobre vídeo real |
+| 20 | `_BinkCopyToBuffer@28` | PENDIENTE | Copia BGRA decodificado; nueva prueba de integración API; uso en rFactor aún no validado tras el ajuste ABI |
+| 21 | `_BinkCopyToBufferRect@44` | PENDIENTE | Copia de rectángulos; corregido offset de FrameRects (+4); pruebas con imagen sintética |
 | 22 | `_BinkDDSurfaceType@4` | NO | Introspección de superficies DirectDraw no implementada |
 | 23 | `_BinkDX8SurfaceType@4` | NO | Mapeo Direct3D8 no implementado |
 | 24 | `_BinkDX9SurfaceType@4` | NO | Mapeo Direct3D9 no implementado |
-| 25 | `_BinkDoFrame@4` | PENDIENTE | Backend FFmpeg vídeo Bink1 opcional no compilado ni probado; compilación distribuida falla explícitamente |
+| 25 | `_BinkDoFrame@4` | PENDIENTE | Backend FFmpeg decodifica fotogramas según el registro del usuario; visibilidad tras corrección ABI pendiente de confirmar |
 | 26 | `_BinkGetError@0` | UNITARIO | Cadena de error propia, mensajes diferentes del original |
 | 27 | `_BinkGetFrameBuffersInfo@8` | PARCIAL | Propuesta de formato YUV420; no verificada contra 2005 |
 | 28 | `_BinkGetKeyFrame@12` | UNITARIO | Índice de keyframes probado con contenedores sintéticos |
