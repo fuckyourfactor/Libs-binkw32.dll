@@ -12,20 +12,20 @@ void bk_index_free(BkIndex *x){
 int bk_parse(const uint8_t *p,size_t len,BkIndex *out){
  uint32_t filesize,n,fpsd,fps,marker,track_count,frame_count,largest,internal,width,height,flags;
  size_t off;uint32_t i,prev=0;
- if(!p||!out||len<48)return 0;
+ if(!p||!out||len<44)return 0;
  bk_memset(out,0,sizeof(*out));
  if(p[0]!='B'||p[1]!='I'||p[2]!='K')return 0;
  /* The 2005 SDK targets Bink 1. Bink 2 is explicitly unsupported. */
  if(p[3]!='b'&&p[3]!='f'&&p[3]!='g'&&p[3]!='h'&&p[3]!='i'&&p[3]!='k')return 0;
  marker=rd32(p);filesize=rd32(p+4);frame_count=rd32(p+8);largest=rd32(p+12);
  internal=rd32(p+16);width=rd32(p+20);height=rd32(p+24);
- fps=rd32(p+28);fpsd=rd32(p+32);flags=rd32(p+36);track_count=rd32(p+44);
+ fps=rd32(p+28);fpsd=rd32(p+32);flags=rd32(p+36);track_count=rd32(p+40);
  if(filesize>UINT32_MAX-8u||filesize+8u>len||!frame_count||frame_count>BK_MAX_FRAMES ||
     !width||width>7680||!height||height>4800||!fps||!fpsd||largest>len||track_count>BK_MAX_TRACKS)return 0;
  out->frames=frame_count;out->tracks=track_count;out->width=width;out->height=height;
  out->fps_num=fps;out->fps_den=fpsd;out->marker=marker;out->largest_frame=largest;
  out->internal_frames=internal;out->flags=flags;out->data=p;out->file_size=filesize+8u;
- off=48;
+ off=44;
  if(p[3]=='k')off+=4; /* newer Bink1 variants contain an extra field */
  if(off>len || track_count>(len-off)/12)return 0;
  out->offset=(uint32_t*)bk_alloc((size_t)(frame_count+1)*sizeof(uint32_t));
@@ -39,10 +39,13 @@ int bk_parse(const uint8_t *p,size_t len,BkIndex *out){
  for(i=0;i<track_count;i++){out->track_rates[i]=(uint32_t)rd16(p+off);out->track_types[i]=(uint32_t)rd16(p+off+2);off+=4;}
  for(i=0;i<track_count;i++){out->track_ids[i]=rd32(p+off);off+=4;}
  if(frame_count>(len-off)/4)goto bad;
+ /* Every offset points past the *entire* frame index, not the
+  * position of the individual index entry currently being read. */
+ size_t payload_start=off+(size_t)frame_count*4;
  for(i=0;i<frame_count;i++){
   if(!get32(p,len,off,&n))goto bad;off+=4;
   out->offset[i]=n&~1u;out->key[i]=(uint8_t)(i==0 || (n&1u));
-  if(out->offset[i]<off||out->offset[i]>=out->file_size || (i && out->offset[i]<=prev))goto bad;
+  if(out->offset[i]<payload_start||out->offset[i]>=out->file_size || (i && out->offset[i]<=prev))goto bad;
   prev=out->offset[i];
  }
  out->offset[frame_count]=(uint32_t)out->file_size;

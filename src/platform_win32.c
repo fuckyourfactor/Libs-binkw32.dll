@@ -6,6 +6,45 @@ extern WIN32API unsigned int __stdcall GetFileSize(void*,unsigned int*);
 extern WIN32API int __stdcall ReadFile(void*,void*,unsigned int,unsigned int*,void*);
 extern WIN32API int __stdcall CloseHandle(void*);
 extern WIN32API unsigned int __stdcall GetTickCount(void);
+/* 32-bit Windows MEMORY_BASIC_INFORMATION, Windows API uses SIZE_T. */
+typedef struct BkMemoryRegion {
+ void *base, *allocation_base;
+ unsigned int allocation_protect;
+ size_t region_size;
+ unsigned int state, protect, type;
+} BkMemoryRegion;
+extern WIN32API size_t __stdcall VirtualQuery(const void*, BkMemoryRegion*,size_t);
+#define BK_MEM_COMMIT 0x1000u
+#define BK_PAGE_GUARD 0x100u
+#define BK_PAGE_NOACCESS 0x01u
+#define BK_FILE_LIMIT (256u*1024u*1024u)
+/* Test each region before reading. This is a sanity check, not a way to
+ * make a hostile/concurrently unmapped address safe against all races. */
+static int readable_region(const uint8_t *ptr,size_t len){
+ uintptr_t cur=(uintptr_t)ptr;
+ if(!ptr||len==0||len>BK_FILE_LIMIT||cur+len<cur)return 0;
+ uintptr_t end=cur+len;
+ while(cur<end){
+  BkMemoryRegion r;
+  if(VirtualQuery((void*)cur,&r,sizeof(r))!=sizeof(r))return 0;
+  if(r.state!=BK_MEM_COMMIT || (r.protect&(BK_PAGE_GUARD|BK_PAGE_NOACCESS)))return 0;
+  uintptr_t region_end=(uintptr_t)r.base+r.region_size;
+  if(region_end<=cur)return 0;
+  cur=region_end<end?region_end:end;
+ }
+ return 1;
+}
+unsigned char *bk_load_memory(const void *source,size_t *size){
+ const uint8_t *p=(const uint8_t*)source;
+ if(!size||!readable_region(p,44))return NULL;
+ if(p[0]!='B'||p[1]!='I'||p[2]!='K')return NULL;
+ uint32_t declared=(uint32_t)p[4]|((uint32_t)p[5]<<8)|((uint32_t)p[6]<<16)|((uint32_t)p[7]<<24);
+ size_t len=(size_t)declared+8u;
+ if(len<44||len>BK_FILE_LIMIT||!readable_region(p,len))return NULL;
+ uint8_t *copy=(uint8_t*)bk_alloc(len);
+ if(!copy)return NULL;
+ bk_memcpy(copy,p,len);*size=len;return copy;
+}
 extern WIN32API void __stdcall Sleep(unsigned int);
 __declspec(dllimport) void* __cdecl malloc(size_t);
 __declspec(dllimport) void __cdecl free(void*);

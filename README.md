@@ -2,6 +2,23 @@
 
 **No es todavía un reemplazo 100% compatible ni una DLL con compatibilidad de reproducción verificada en rFactor.** Este proyecto busca interoperabilidad con el binario Win32 x86 proporcionado (Bink 1, año 2005). El código original de este repositorio es MIT y **no carga ni redirige a la DLL propietaria**. La ruta multimedia utiliza el proyecto abierto FFmpeg, con sus propias dependencias y licencias LGPL/GPL según la configuración.
 
+## Corrección rFactor: Bink 1 y reproducción desde memoria
+
+La revisión de `bink-open.log` encontró un fallo del parser en `src/container.c`:
+la cantidad de pistas está en el offset **40**, no en 44, y la tabla de
+fotogramas empieza en **44** (en `BIKk`, en 48). También se implementó la
+apertura `BINKFROMMEMORY` (`0x04000000`) que usa rFactor y la decodificación
+mediante un contexto FFmpeg/AVIO basado en bytes, sin obligar a disponer de
+un nombre de archivo. Se añadieron pruebas de regresión para estos casos.
+
+El registro asimismo contiene `failed to read file` para ciertos vídeos:
+eso indica que el archivo solicitado no fue accesible; el parche no puede
+reparar archivos faltantes. Ver `docs/RFACTOR_ANALYSIS.md` para los detalles.
+
+**Validado localmente:** núcleo sin FFmpeg, pruebas y tabla de exportaciones Win32.
+**Pendiente:** compilación completa FFmpeg de GitHub y reproducción real con
+los `.BIK` de rFactor; todavía no se declara compatibilidad total.
+
 ## GitHub Actions: generar un único `binkw32.dll` con FFmpeg integrado
 
 **Corrección del verificador de exportaciones (GitHub Actions, octubre de 2026):**

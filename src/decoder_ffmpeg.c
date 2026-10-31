@@ -8,6 +8,8 @@
 #include "platform.h"
 #include <limits.h>
 #include <errno.h>
+#include <stdio.h>
+#include <libavutil/error.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/channel_layout.h>
@@ -27,7 +29,40 @@ typedef struct BkFFAudio {
  uint32_t cached_frame;
  int configured;
 } BkFFAudio;
+typedef struct BkMemoryIO {
+ const uint8_t *data;
+ int64_t length;
+ int64_t position;
+} BkMemoryIO;
+/* AVIO virtual file: the Bink reader and FFmpeg see the SAME owned bytes,
+ * including when rFactor calls BinkOpen(..., BINKFROMMEMORY). */
+static int bink_read(void *opaque,uint8_t *dst,int count){
+ BkMemoryIO *io=(BkMemoryIO*)opaque;
+ if(count<=0)return AVERROR(EINVAL);
+ if(io->position>=io->length)return AVERROR_EOF;
+ int64_t remain=io->length-io->position;
+ if((int64_t)count>remain)count=(int)remain;
+ bk_memcpy(dst,io->data+io->position,(size_t)count);
+ io->position+=count;
+ return count;
+}
+static int64_t bink_seek(void *opaque,int64_t offset,int whence){
+ BkMemoryIO *io=(BkMemoryIO*)opaque;
+ if(whence==AVSEEK_SIZE)return io->length;
+ whence &= ~AVSEEK_FORCE;
+ int64_t base;
+ if(whence==SEEK_SET)base=0;
+ else if(whence==SEEK_CUR)base=io->position;
+ else if(whence==SEEK_END)base=io->length;
+ else return AVERROR(EINVAL);
+ /* Avoid signed overflow even for unusual seeks from damaged media. */
+ if(offset< -base || offset>io->length-base)return AVERROR(EINVAL);
+ io->position=base+offset;
+ return io->position;
+}
 typedef struct BkFFmpeg {
+ BkMemoryIO source;
+ AVIOContext *io;
  AVFormatContext *fmt;
  AVCodecContext *codec;
  AVFrame *frame;
@@ -53,12 +88,24 @@ void bk_decoder_close(BkHandle *h){
  sws_freeContext(d->sws);
  av_packet_free(&d->pkt);av_frame_free(&d->frame);
  avcodec_free_context(&d->codec);avformat_close_input(&d->fmt);
+ avio_context_free(&d->io);
  bk_free(d);h->decoder=NULL;
 }
 int bk_decoder_open(BkHandle *h,const char *path){
+ (void)path;
  BkFFmpeg *d=(BkFFmpeg*)bk_alloc(sizeof(*d));const AVCodec *codec;
  if(!d)return 0;bk_memset(d,0,sizeof(*d));h->decoder=d;
- if(avformat_open_input(&d->fmt,path,NULL,NULL)<0 || avformat_find_stream_info(d->fmt,NULL)<0)goto failed;
+ if(!h->file||h->index.file_size<44||h->index.file_size>INT64_MAX)goto failed;
+ d->source.data=h->file;
+ d->source.length=(int64_t)h->index.file_size;
+ uint8_t *iobuf=(uint8_t*)av_malloc(32768);
+ if(!iobuf)goto failed;
+ d->io=avio_alloc_context(iobuf,32768,0,&d->source,bink_read,NULL,bink_seek);
+ if(!d->io){av_free(iobuf);goto failed;}
+ d->fmt=avformat_alloc_context();if(!d->fmt)goto failed;
+ d->fmt->pb=d->io;
+ d->fmt->flags|=AVFMT_FLAG_CUSTOM_IO;
+ if(avformat_open_input(&d->fmt,NULL,NULL,NULL)<0 || avformat_find_stream_info(d->fmt,NULL)<0)goto failed;
  d->stream=av_find_best_stream(d->fmt,AVMEDIA_TYPE_VIDEO,-1,-1,NULL,0);
  if(d->stream<0)goto failed;
  AVStream *stream=d->fmt->streams[d->stream];
@@ -83,9 +130,8 @@ int bk_decoder_frame(BkHandle *h,uint32_t target){
  if(!d||!h->rgb||target>=h->api.Frames)return 0;
  if((int64_t)target<d->next-1){
   /* Decoder restart: prior video frame state must not contaminate new seek. */
-  char *path=h->path;
   bk_decoder_close(h);
-  if(!bk_decoder_open(h,path))return 0;
+  if(!bk_decoder_open(h,NULL))return 0;
   d=(BkFFmpeg*)h->decoder;
  }
  if((int64_t)target==d->next-1){ /* Current decoded AVFrame still available. */

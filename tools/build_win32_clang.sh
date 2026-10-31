@@ -18,6 +18,7 @@ LIBRARY KERNEL32.dll
 EXPORTS
 CreateFileA@28=CreateFileA
 GetFileSize@8=GetFileSize
+VirtualQuery@12=VirtualQuery
 ReadFile@20=ReadFile
 CloseHandle@4=CloseHandle
 GetTickCount@0=GetTickCount
@@ -61,7 +62,7 @@ for src in bink_api container pixel audio_mix sound_driver surface trace audio_w
     -c "src/$src.c" -o "build-win32/$src.obj"
 done
 aliases=()
-for entry in CreateFileA@28 GetFileSize@8 ReadFile@20 CloseHandle@4 GetTickCount@0 \
+for entry in CreateFileA@28 GetFileSize@8 VirtualQuery@12 ReadFile@20 CloseHandle@4 GetTickCount@0 \
              Sleep@4 GetEnvironmentVariableA@12 WriteFile@20 GetDC@4 GetClientRect@8 ClientToScreen@8 ReleaseDC@8 StretchDIBits@52 waveOutOpen@24 waveOutPrepareHeader@12 waveOutUnprepareHeader@12 waveOutWrite@12 waveOutReset@4 waveOutPause@4 waveOutRestart@4 waveOutClose@4; do
   aliases+=("/alternatename:__imp__${entry}=__imp_${entry}")
 done

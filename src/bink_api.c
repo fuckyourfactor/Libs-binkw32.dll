@@ -39,13 +39,18 @@ BK_API char* BK_CALL BinkBufferGetError(void){return g_buffer_error;}
 BK_API HBINK BK_CALL BinkOpen(const char *name,U32 flags){
  size_t len=0;uint8_t *data=NULL;BkHandle *h=NULL;
  error("");
- if(!name){error("BinkOpen: null filename");bk_trace("BinkOpen null filename flags=0x%08X",flags);return NULL;}
- bk_trace("BinkOpen path=%.220s flags=0x%08X",name,flags);
- if(flags & (BINKFROMMEMORY|0x00800000u|0x02000000u)){
-  error("BinkOpen: memory, existing-handle and custom-IO sources not implemented");return NULL;
+ if(!name){error("BinkOpen: null source");bk_trace("BinkOpen null source flags=0x%08X",flags);return NULL;}
+ const int from_memory=(flags&BINKFROMMEMORY)!=0;
+ if(from_memory)bk_trace("BinkOpen memory source flags=0x%08X",flags);
+ else bk_trace("BinkOpen path=%.220s flags=0x%08X",name,flags);
+ if(flags & (0x00800000u|0x02000000u)){
+  error("BinkOpen: existing-handle and custom-IO sources not implemented");return NULL;
  }
- data=bk_load_file(name,&len);
- if(!data){error("BinkOpen: file inaccessible or exceeds 256 MiB");bk_trace("BinkOpen failed to read file");return NULL;}
+ data=from_memory?bk_load_memory(name,&len):bk_load_file(name,&len);
+ if(!data){
+  error(from_memory?"BinkOpen: unreadable or invalid memory source":"BinkOpen: file inaccessible or exceeds 256 MiB");
+  bk_trace("BinkOpen failed to read %s",from_memory?"memory source":"file");return NULL;
+ }
  h=(BkHandle*)bk_alloc(sizeof(*h));
  if(!h){bk_free(data);error("Out of memory");return NULL;}
  bk_memset(h,0,sizeof(*h));
@@ -53,7 +58,7 @@ BK_API HBINK BK_CALL BinkOpen(const char *name,U32 flags){
   bk_free(data);bk_free(h);error("BinkOpen: invalid or unsupported Bink 1 container");bk_trace("BinkOpen invalid Bink header / frame index");return NULL;
  }
  h->file=data;
- h->path=strdup_local(name);
+ h->path=from_memory?NULL:strdup_local(name);
  h->api.Width=h->index.width;h->api.Height=h->index.height;
  h->api.Frames=h->index.frames;h->api.FrameNum=1;
  h->api.FrameRate=(g_forced_num && (flags&0x1000u))?g_forced_num:h->index.fps_num;
@@ -77,9 +82,9 @@ BK_API HBINK BK_CALL BinkOpen(const char *name,U32 flags){
 
  h->rgb_free=(g_allocator&&g_deallocator)?g_deallocator:NULL;
  h->rgb=(unsigned char*)alloc_local((size_t)h->api.Width*h->api.Height*4);
- if(!h->rgb||!h->path){BinkClose(&h->api);error("Out of memory");return NULL;}
+ if(!h->rgb||(!from_memory&&!h->path)){BinkClose(&h->api);error("Out of memory");return NULL;}
  update_frame_sizes(h);
- if(!bk_decoder_open(h,name)){
+ if(!bk_decoder_open(h,from_memory?NULL:name)){
 #ifdef BINK_WITH_FFMPEG
   /* Never return a movie handle that is guaranteed to fail at DoFrame. */
   error("BinkOpen: FFmpeg could not initialize this Bink video");

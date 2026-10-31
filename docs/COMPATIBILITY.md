@@ -44,7 +44,7 @@
 | 38 | `_BinkIsSoftwareCursor@8` | NO | No hay detección de cursor software |
 | 39 | `_BinkLogoAddress@0` | NO | No incluye material gráfico propietario |
 | 40 | `_BinkNextFrame@4` | UNITARIO | Avance/ciclo de fotogramas y temporizador |
-| 41 | `_BinkOpen@8` | UNITARIO | Lee contenedor Bink1 válido, indexa y prepara estado; decodificación opcional |
+| 41 | `_BinkOpen@8` | UNITARIO | Analiza encabezados BIKi/BIKk en offsets correctos, admite archivos y BINKFROMMEMORY (casos sintéticos); decodificación FFmpeg con AVIO pendiente de validar |
 | 42 | `_BinkOpenDirectSound@4` | PARCIAL | Devuelve adaptador PCM WinMM funcional como alternativa; sin implementación nativa DirectSound, no probado en rFactor |
 | 43 | `_BinkOpenMiles@4` | PARCIAL | Devuelve adaptador PCM WinMM funcional como alternativa; sin mezcla nativa de Miles, no probado en rFactor |
 | 44 | `_BinkOpenTrack@8` | PARCIAL | Crea descriptor de frecuencia/canales; no decodifica audio |
