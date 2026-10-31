@@ -22,11 +22,40 @@ else()
   list(APPEND BK_SOURCES src/decoder_none.c)
 endif()
 if(WIN32)
-  add_library(binkw32 SHARED ${BK_SOURCES} src/binkw32.def)
+  # The reference .def is written for MSVC/lld-link. GNU ld (MinGW) needs
+  # explicit aliases from the *public* _Func@N names to internal Func@N
+  # (it inserts the internal COFF underscore automatically). Use a generated
+  # .def so both toolchains expose exactly the original 66 decorated exports.
+  if(MINGW)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    set(BINK_EXPORT_DEF "${CMAKE_CURRENT_BINARY_DIR}/binkw32-mingw.def")
+    execute_process(
+      COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_mingw_def.py"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def"
+        "${CMAKE_CURRENT_SOURCE_DIR}/docs/exports.json"
+        "${BINK_EXPORT_DEF}"
+      RESULT_VARIABLE BINK_DEF_RESULT
+      OUTPUT_VARIABLE BINK_DEF_OUTPUT
+      ERROR_VARIABLE BINK_DEF_ERROR
+    )
+    if(NOT BINK_DEF_RESULT EQUAL 0)
+      message(FATAL_ERROR "Cannot generate MinGW exports: ${BINK_DEF_ERROR}")
+    endif()
+    message(STATUS "${BINK_DEF_OUTPUT}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def"
+      "${CMAKE_CURRENT_SOURCE_DIR}/docs/exports.json"
+      "${CMAKE_CURRENT_SOURCE_DIR}/tools/make_mingw_def.py")
+  else()
+    set(BINK_EXPORT_DEF "${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def")
+  endif()
+  add_library(binkw32 SHARED ${BK_SOURCES} "${BINK_EXPORT_DEF}")
   set_target_properties(binkw32 PROPERTIES PREFIX "" OUTPUT_NAME "binkw32")
   target_link_libraries(binkw32 PRIVATE gdi32 user32 kernel32 winmm)
   if(MINGW)
-    target_link_options(binkw32 PRIVATE "-Wl,--enable-stdcall-fixup")
+    # Never permit fuzzy stdcall symbol matching to mask ABI mistakes.
+    target_link_options(binkw32 PRIVATE "-Wl,--disable-stdcall-fixup")
   endif()
 else()
   add_library(binkw32 SHARED ${BK_SOURCES})
@@ -36,20 +65,35 @@ target_include_directories(binkw32 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PR
 target_compile_definitions(binkw32 PRIVATE BINK_BUILD)
 if(BINK_WITH_FFMPEG)
   if(BINK_FFMPEG_STATIC)
-    # PkgConfig::AV uses pkg-config --libs, which omits Libs.private.
-    # A static FFmpeg link MUST also use pkg-config --static --libs:
-    # those private libraries include platform dependencies.
+    # FindPkgConfig provides AV_STATIC_LDFLAGS, AV_STATIC_LIBRARIES, etc.
+    # AV_STATIC_LINK_LIBRARIES is NOT a documented output variable: using it
+    # silently omitted ALL FFmpeg archives from the previous link command.
+    # The full --static --libs list preserves the order and Libs.private.
+    if(NOT AV_STATIC_LDFLAGS)
+      message(FATAL_ERROR "pkg-config returned no --static linker flags for FFmpeg")
+    endif()
+    foreach(required avformat avcodec avutil swscale swresample)
+      if(NOT "${AV_STATIC_LIBRARIES}" MATCHES "(^|;)${required}(;|$)")
+        message(FATAL_ERROR "Static FFmpeg link is missing ${required}: ${AV_STATIC_LDFLAGS}")
+      endif()
+    endforeach()
+    message(STATUS "Static FFmpeg link flags: ${AV_STATIC_LDFLAGS}")
     target_include_directories(binkw32 PRIVATE ${AV_INCLUDE_DIRS})
-    target_link_directories(binkw32 PRIVATE ${AV_STATIC_LIBRARY_DIRS})
-    target_link_libraries(binkw32 PRIVATE ${AV_STATIC_LINK_LIBRARIES})
     if(AV_STATIC_CFLAGS_OTHER)
       target_compile_options(binkw32 PRIVATE ${AV_STATIC_CFLAGS_OTHER})
     endif()
-    if(AV_STATIC_LDFLAGS_OTHER)
-      target_link_options(binkw32 PRIVATE ${AV_STATIC_LDFLAGS_OTHER})
-    endif()
+    # Must be target_link_libraries, NOT target_link_options: MinGW needs
+    # archives AFTER the object files on the link line.
     if(WIN32 AND MINGW)
+      # The five static archives have circular/ordering dependencies.
+      # A GNU linker group resolves them even if pkg-config lists avutil
+      # before a codec that later references it.
+      target_link_libraries(binkw32 PRIVATE
+        "-Wl,--start-group" ${AV_STATIC_LDFLAGS} "-Wl,--end-group"
+        gdi32 user32 kernel32 winmm)
       target_link_options(binkw32 PRIVATE -static -static-libgcc)
+    else()
+      target_link_libraries(binkw32 PRIVATE ${AV_STATIC_LDFLAGS})
     endif()
   else()
     target_link_libraries(binkw32 PRIVATE PkgConfig::AV)
@@ -64,6 +108,7 @@ if(BINK_BUILD_TESTS)
  find_package(Python3 COMPONENTS Interpreter)
  if(Python3_Interpreter_FOUND)
    add_test(NAME export_manifest COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_def.py ${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def ${CMAKE_CURRENT_SOURCE_DIR}/docs/exports.json)
+   add_test(NAME mingw_export_aliases COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_mingw_def.py)
  endif()
 endif()
 

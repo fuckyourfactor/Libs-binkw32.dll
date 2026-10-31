@@ -4,6 +4,14 @@
 
 ## GitHub Actions: generar un único `binkw32.dll` con FFmpeg integrado
 
+**Corrección del enlazado (log de GitHub Actions):** la variante MinGW genera
+`build-win32-ffmpeg/binkw32-mingw.def` a partir del manifiesto original y
+resuelve el problema `cannot export _BinkOpen@8: symbol not defined` sin cambiar
+los nombres/ordinales públicos. CMake utiliza `${AV_STATIC_LDFLAGS}`
+(`pkg-config --static --libs`) para enlazar las cinco bibliotecas FFmpeg y
+sus dependencias privadas, en vez de la variable inexistente
+`AV_STATIC_LINK_LIBRARIES`. Los tests verifican además el archivo de alias.
+
 El workflow [`.github/workflows/build.yml`](.github/workflows/build.yml) compila **Windows PE32 x86** desde Ubuntu con MinGW-w64. Descarga **FFmpeg 7.1.5**, lo compila como cinco bibliotecas **estáticas** con solamente el demuxer Bink1 y los decodificadores de vídeo Bink y audio Bink DCT/RDFT. Después construye `binkw32.dll` enlazando FFmpeg dentro del mismo PE y verifica las **66 exportaciones** (nombres decorados + ordinales), la arquitectura y la ausencia de DLL externas no pertenecientes a Windows.
 
 Para utilizarlo en tu repositorio GitHub:
@@ -35,7 +43,14 @@ python3 tools/check_win32_dll.py build-win32-ffmpeg/binkw32.dll \
 
 Resultado: `build-win32-ffmpeg/binkw32.dll`. El workflow copia únicamente ese archivo a `dist/`.
 
-**Nivel de verificación:** la configuración del CI, sus scripts y las pruebas existentes se han revisado, pero no se ha ejecutado todavía un job remoto con FFmpeg en este entorno. El éxito de la compilación con FFmpeg queda por confirmar en GitHub Actions; la decodificación con Bink real y la compatibilidad con rFactor tampoco se han validado. La salida sin FFmpeg de versiones anteriores **no debe confundirse con esta nueva compilación**.
+**Nivel de verificación:** los siete tests nativos pasan y se ha validado la
+exportación PE32 de los 66 nombres/ordinales con un enlazador COFF mediante
+un programa de pruebas independiente. También se comprobó la presencia de
+`-lavformat`, `-lavcodec`, `-lavutil`, `-lswscale`, `-lswresample` y
+`Libs.private` en la línea de enlace CMake usando archivos pkg-config de
+prueba. **No se ha podido repetir aquí el trabajo remoto completo con las
+bibliotecas FFmpeg Win32 reales**: debe verificarse con el workflow en GitHub.
+Tampoco se ha probado decodificación con Bink real ni compatibilidad con rFactor. La salida sin FFmpeg de versiones anteriores **no debe confundirse con esta nueva compilación**.
 
 **Licencias:** el código de este proyecto es MIT; la distribución del binario que incorpora FFmpeg enlazado estáticamente debe respetar también las obligaciones **LGPL** de FFmpeg, incluyendo los avisos, disponibilidad del código fuente de FFmpeg y la posibilidad de modificar y volver a enlazar la biblioteca. El workflow no habilita componentes GPL o no libres. Consulta https://ffmpeg.org/legal.html antes de distribuir el binario.
 

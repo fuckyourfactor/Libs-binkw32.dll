@@ -54,7 +54,8 @@ jobs:
             -DBINK_WITH_FFMPEG=ON \
             -DBINK_FFMPEG_STATIC=ON \
             -DBINK_BUILD_TESTS=OFF
-          cmake --build build-win32-ffmpeg --target binkw32 --parallel 4
+          # Verbose link line exposes missing -lavcodec/-lavformat immediately.
+          cmake --build build-win32-ffmpeg --target binkw32 --parallel 4 --verbose
 
       - name: Verify PE32, exact exports, static multimedia link, and filename
         run: |
