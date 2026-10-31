@@ -159,3 +159,14 @@ python3 tools/audit_original_2005.py binkw32-original.dll rFactor.exe
 
 **Estado:** verificados ABI y pruebas de copia con datos sintéticos, y compilada
 la DLL Win32 sin FFmpeg; pendiente de validar vídeo real en rFactor/Windows.
+
+## Corrección de entrega de píxeles (31 oct 2026)
+
+El registro `LOG.txt` posterior a la corrección de la ABI confirma una causa
+independiente del vídeo invisible: `BinkNextFrame` actualiza `FrameNum` antes
+de que rFactor copie la imagen, pero `BinkGetRects` y `BinkCopyToBufferRect`
+rechazaban la operación si `frame_decoded != FrameNum`. El patrón constante
+`current=N decoded=N-1` demuestra que el sistema tenía disponible la imagen
+y la descartaba al intentar presentarla. Se corrige conservando el último
+fotograma decodificado hasta que lo sustituya otra decodificación, o se
+invalide mediante un salto `BinkGoto`. Ver `DISPLAY_HANDOFF_FIX.md`.

@@ -23,8 +23,8 @@
 | 17 | `_BinkCloseTrack@4` | PARCIAL | Libera objeto de pista; no dispositivo de audio |
 | 18 | `_BinkControlBackgroundIO@8` | NO | No se implementa hilo de IO |
 | 19 | `_BinkControlPlatformFeatures@8` | NO | Máscaras de CPU sin implementación |
-| 20 | `_BinkCopyToBuffer@28` | PENDIENTE | Copia BGRA decodificado; nueva prueba de integración API; uso en rFactor aún no validado tras el ajuste ABI |
-| 21 | `_BinkCopyToBufferRect@44` | PENDIENTE | Copia de rectángulos; corregido FrameRects al offset +52 real de Bink 1.8f; pruebas con imagen sintética |
+| 20 | `_BinkCopyToBuffer@28` | PENDIENTE | Copia BGRA del último fotograma decodificado incluso tras BinkNextFrame; prueba de secuencia rFactor; pendiente de ejecución real |
+| 21 | `_BinkCopyToBufferRect@44` | PENDIENTE | Copia de rectángulos tras BinkNextFrame sin rechazo erróneo; corregido FrameRects +52; validación en Windows pendiente |
 | 22 | `_BinkDDSurfaceType@4` | NO | Introspección de superficies DirectDraw no implementada |
 | 23 | `_BinkDX8SurfaceType@4` | NO | Mapeo Direct3D8 no implementado |
 | 24 | `_BinkDX9SurfaceType@4` | NO | Mapeo Direct3D9 no implementado |
@@ -34,7 +34,7 @@
 | 28 | `_BinkGetKeyFrame@12` | UNITARIO | Índice de keyframes probado con contenedores sintéticos |
 | 29 | `_BinkGetPalette@4` | NO | No disponible en backend RGB |
 | 30 | `_BinkGetRealtime@12` | PARCIAL | Métricas básicas, no incorpora contadores históricos ni IO |
-| 31 | `_BinkGetRects@8` | PARCIAL | Rectángulo completo en fotogramas decodificados |
+| 31 | `_BinkGetRects@8` | PARCIAL | Rectángulo completo del último fotograma decodificado incluso tras BinkNextFrame; comprobado en prueba local |
 | 32 | `_BinkGetSummary@8` | UNITARIO | Dimensiones, fps, duración, tasa de datos; resto de métricas en cero |
 | 33 | `_BinkGetTrackData@8` | NO | No decodifica audio Bink a PCM |
 | 34 | `_BinkGetTrackID@8` | UNITARIO | Obtiene identificador de pista del contenedor |
@@ -43,7 +43,7 @@
 | 37 | `_BinkGoto@12` | UNITARIO | Cambia posición lógica; FFmpeg redecodifica al retroceder |
 | 38 | `_BinkIsSoftwareCursor@8` | NO | No hay detección de cursor software |
 | 39 | `_BinkLogoAddress@0` | NO | No incluye material gráfico propietario |
-| 40 | `_BinkNextFrame@4` | UNITARIO | Avance/ciclo de fotogramas y temporizador |
+| 40 | `_BinkNextFrame@4` | UNITARIO | Avance/ciclo de fotogramas sin invalidar imagen pendiente de copia; temporizador; prueba de regresión |
 | 41 | `_BinkOpen@8` | UNITARIO | Analiza encabezados BIKi/BIKk en offsets correctos, admite archivos y BINKFROMMEMORY (casos sintéticos); decodificación FFmpeg con AVIO pendiente de validar |
 | 42 | `_BinkOpenDirectSound@4` | PARCIAL | Devuelve adaptador PCM WinMM funcional como alternativa; sin implementación nativa DirectSound, no probado en rFactor |
 | 43 | `_BinkOpenMiles@4` | PARCIAL | Devuelve adaptador PCM WinMM funcional como alternativa; sin mezcla nativa de Miles, no probado en rFactor |

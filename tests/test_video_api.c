@@ -35,7 +35,7 @@ int main(void) {
   }
   h.api.Width = 4;
   h.api.Height = 4;
-  h.api.Frames = 1;
+  h.api.Frames = 3;
   h.api.FrameNum = 1;
   h.api.FrameRate = 30;
   h.api.FrameRateDiv = 1;
@@ -63,9 +63,41 @@ int main(void) {
   assert(memcmp(dst+1*16+4, bgra+1*16+4, 8)==0); /* dest y=1, src y=1 */
   assert(memcmp(dst+2*16+4, bgra+2*16+4, 8)==0);
   assert(dst[0] == 0xCC);
+
+  /* rFactor's observed order: DoFrame(1) -> NextFrame() -> Copy(1).
+   * FrameNum now means the next frame to decode; the buffer still contains
+   * the previous decoded frame. This previously returned zero for EVERY
+   * frame in the user's game even while audio/video decoding succeeded. */
+  U32 frame_offsets[4] = {0, 16, 32, 48};
+  h.index.frames = 3;
+  h.index.offset = frame_offsets;
+  h.api.LastFrameNum = 1;
+  BinkNextFrame(&h.api);
+  assert(h.api.FrameNum == 2 && h.frame_decoded == 1);
+  assert(BinkGetRects(&h.api, BINKSURFACE32) == 1);
+  assert(h.api.NumRects == 1);
+  memset(dst, 0xCC, sizeof(dst));
+  assert(BinkCopyToBufferRect(&h.api, dst, 16, 4, 0, 0, 0, 0, 4, 4,
+                              BINKSURFACE32));
+  assert(memcmp(dst, bgra, sizeof(dst)) == 0);
+  /* Rendering can request the SAME decoded image many times before the
+   * next decode. Neither attempt may be rejected due to FrameNum. */
+  memset(dst, 0xCC, sizeof(dst));
+  assert(BinkCopyToBuffer(&h.api, dst, 16, 4, 0, 0, BINKSURFACE32));
+  assert(memcmp(dst, bgra, sizeof(dst)) == 0);
+  /* An explicit seek, unlike NextFrame, invalidates previous image data. */
+  BinkGoto(&h.api, 3, 0);
+  assert(h.api.FrameNum == 3 && h.frame_decoded == 0);
+  assert(BinkGetRects(&h.api, BINKSURFACE32) == 0);
+  assert(BinkCopyToBuffer(&h.api, dst, 16, 4, 0, 0, BINKSURFACE32) == 0);
+  /* A subsequent successfully decoded frame is presentable again. */
+  h.frame_decoded = 3;
+  h.api.LastFrameNum = 3;
+  assert(BinkCopyToBufferRect(&h.api, dst, 16, 4, 0, 0, 0, 0, 4, 4,
+                              BINKSURFACE32));
   h.frame_decoded = 0;
   assert(!BinkCopyToBuffer(&h.api,dst,16,4,0,0,BINKSURFACE32));
   assert(!BinkGetRects(&h.api,BINKSURFACE32));
-  puts("video handoff and original Bink 1.8f ABI offsets verified");
+  puts("rFactor decode -> NextFrame -> Copy, seek invalidation and Bink 1.8f ABI verified");
   return 0;
 }

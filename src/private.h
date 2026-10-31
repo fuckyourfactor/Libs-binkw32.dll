@@ -21,7 +21,7 @@ typedef struct BkHandle {
  uint32_t last_audio_decode_ms;
  /* Diagnostic rate limits: log the first few host presentation requests even
   * if they occur after frame 3. These fields are private, after BINK. */
- uint32_t trace_rect_count, trace_copy_count;
+ uint32_t trace_rect_count, trace_copy_count, trace_copy_failure_count;
 
 } BkHandle;
 /* Returns 1 only on an actual decoded frame, never on success-shaped placeholders. */

@@ -2,6 +2,32 @@
 
 **No es todavía un reemplazo 100% compatible ni una DLL con compatibilidad de reproducción verificada en rFactor.** Este proyecto busca interoperabilidad con el binario Win32 x86 proporcionado (Bink 1, año 2005). El código original de este repositorio es MIT y **no carga ni redirige a la DLL propietaria**. La ruta multimedia utiliza el proyecto abierto FFmpeg, con sus propias dependencias y licencias LGPL/GPL según la configuración.
 
+## Corrección de vídeo: entrega del último fotograma decodificado a rFactor (31 oct 2026)
+
+El registro real de rFactor mostró **2.410 rechazos** de `BinkCopyToBufferRect`
+(`no frame`) y **cero copias correctas**, aunque `BinkDoFrame` tenía éxito.
+También `BinkGetRects` rechazaba imágenes válidas. Todas las llamadas fallidas
+mostraban `FrameNum = frame_decoded + 1`: rFactor realiza la secuencia
+`BinkDoFrame(n) -> BinkNextFrame() -> BinkGetRects()/BinkCopyToBufferRect(n)`.
+
+**Causa demostrada:** se comparaba `frame_decoded` contra el campo público
+`BINK.FrameNum`, que ya apunta al **siguiente** fotograma. No representaba la
+imagen decodificada que seguía en el búfer BGRA. Ahora `BinkGetRects` y
+`BinkCopyToBufferRect` utilizan el último fotograma decodificado mientras
+exista; `BinkNextFrame` no lo invalida. Un `BinkGoto` sí invalida el fotograma
+anterior para impedir mostrar imágenes obsoletas después de un seek.
+
+La prueba `video_api_abi_and_copy` verifica la misma secuencia, incluyendo
+dos copias posteriores a `BinkNextFrame`, y el rechazo correcto después de
+`BinkGoto`. El log de éxito registra `decoded`, `next`, `flags`, `pitch` y
+rectángulos. Los errores repetitivos de copia están limitados para evitar
+logs de miles de líneas. Detalles en `docs/DISPLAY_HANDOFF_FIX.md`.
+
+**Verificado:** diez pruebas nativas, diez con UBSan y DLL PE32 sin FFmpeg
+con las 66 exportaciones. **Pendiente:** ejecutar la compilación remota con
+FFmpeg y verificar que rFactor presenta correctamente un `.BIK` real en
+Windows. No uses la DLL de diagnóstico sin FFmpeg como sustituto de vídeo.
+
 ## Corrección rFactor: ABI verificada contra la DLL original de 2005
 
 **Se corrigió un error de la versión anterior del proyecto.** La actualización
