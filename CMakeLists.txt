@@ -22,6 +22,15 @@ else()
   list(APPEND BK_SOURCES src/decoder_none.c)
 endif()
 if(WIN32)
+  # 'single' is the nominal GNU public export name. If the linked PE has
+  # exactly one missing/extra prefix underscore, the workflow selects the
+  # alternative and relinks; the final exact-ABI check always runs.
+  set(BINK_MINGW_PUBLIC_NAME_PREFIX "single" CACHE STRING
+      "GNU ld public export prefix (single, double, none)")
+  set_property(CACHE BINK_MINGW_PUBLIC_NAME_PREFIX PROPERTY STRINGS single double none)
+  if(NOT BINK_MINGW_PUBLIC_NAME_PREFIX MATCHES "^(single|double|none)$")
+    message(FATAL_ERROR "Unknown BINK_MINGW_PUBLIC_NAME_PREFIX")
+  endif()
   # The reference .def is written for MSVC/lld-link. GNU ld (MinGW) needs
   # explicit aliases from the *public* _Func@N names to internal Func@N
   # (it inserts the internal COFF underscore automatically). Use a generated
@@ -35,6 +44,7 @@ if(WIN32)
         "${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def"
         "${CMAKE_CURRENT_SOURCE_DIR}/docs/exports.json"
         "${BINK_EXPORT_DEF}"
+        "--public-prefix" "${BINK_MINGW_PUBLIC_NAME_PREFIX}"
       RESULT_VARIABLE BINK_DEF_RESULT
       OUTPUT_VARIABLE BINK_DEF_OUTPUT
       ERROR_VARIABLE BINK_DEF_ERROR
@@ -109,6 +119,7 @@ if(BINK_BUILD_TESTS)
  if(Python3_Interpreter_FOUND)
    add_test(NAME export_manifest COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_def.py ${CMAKE_CURRENT_SOURCE_DIR}/src/binkw32.def ${CMAKE_CURRENT_SOURCE_DIR}/docs/exports.json)
    add_test(NAME mingw_export_aliases COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_mingw_def.py)
+   add_test(NAME pe_export_directory COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_pe_exports.py)
  endif()
 endif()
 

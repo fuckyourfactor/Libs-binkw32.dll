@@ -18,7 +18,16 @@ import re
 PATTERN = re.compile(r'^\s*(_([A-Za-z][A-Za-z0-9_]*)@(\d+))\s+@(\d+)\s*$')
 
 
-def generate(source: Path, manifest: Path) -> str:
+def generate(source: Path, manifest: Path, public_prefix: str = 'single') -> str:
+    """Produce public PE names and correct COFF internal aliases.
+
+    `single` is the nominal public spelling. Some MinGW linker versions
+    strip or add a COFF prefix; the workflow inspects the linked PE and only
+    switches to `double` or `none` when that precisely repairs the exports.
+    """
+    if public_prefix not in ('single', 'double', 'none'):
+        raise ValueError(f'Unknown public name prefix: {public_prefix}')
+    public_lead = {'single': '_', 'double': '__', 'none': ''}[public_prefix]
     expected = json.loads(manifest.read_text(encoding='utf-8'))
     exports = []
     for line in source.read_text(encoding='utf-8').splitlines():
@@ -35,7 +44,7 @@ def generate(source: Path, manifest: Path) -> str:
             {'name': x['name'], 'ordinal': x['ordinal']} for x in expected]:
         raise ValueError('Export manifest does not match .def (names/order/ordinals)')
     return ('LIBRARY binkw32\nEXPORTS\n' + ''.join(
-        f'    {x["name"]} = {x["internal"]} @{x["ordinal"]}\n' for x in exports))
+        f'    {public_lead}{x["name"][1:]} = {x["internal"]} @{x["ordinal"]}\n' for x in exports))
 
 
 def main():
@@ -43,8 +52,9 @@ def main():
     parser.add_argument('source', type=Path)
     parser.add_argument('manifest', type=Path)
     parser.add_argument('output', type=Path)
+    parser.add_argument('--public-prefix', choices=('single', 'double', 'none'), default='single')
     args = parser.parse_args()
-    data = generate(args.source, args.manifest)
+    data = generate(args.source, args.manifest, args.public_prefix)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(data, encoding='ascii')
     print(f'Created GNU MinGW export aliases in {args.output}')

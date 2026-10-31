@@ -4,7 +4,18 @@
 
 ## GitHub Actions: generar un único `binkw32.dll` con FFmpeg integrado
 
-**Corrección del enlazado (log de GitHub Actions):** la variante MinGW genera
+**Corrección del verificador de exportaciones (GitHub Actions, octubre de 2026):**
+El anterior `tools/check_def.py` analizaba la salida textual de `objdump`
+y podía contar **0 exportaciones** aun cuando el enlace hubiera terminado.
+Ahora `tools/pe_exports.py` lee directamente el directorio de exportaciones
+PE32 y compara los **66 nombres completos y ordinales**. Si MinGW ha quitado
+o añadido exactamente un guion bajo a *todos* los nombres públicos, el
+workflow regenera el `.def` con el prefijo adecuado y **vuelve a enlazar**.
+La comprobación posterior nunca acepta nombres alterados, ordinales faltantes
+ni exportaciones adicionales. Cuando el error no es un cambio de prefijo
+uniforme, la compilación se detiene y muestra ejemplos reales de la tabla PE.
+
+**Corrección anterior del enlazado (log de GitHub Actions):** la variante MinGW genera
 `build-win32-ffmpeg/binkw32-mingw.def` a partir del manifiesto original y
 resuelve el problema `cannot export _BinkOpen@8: symbol not defined` sin cambiar
 los nombres/ordinales públicos. CMake utiliza `${AV_STATIC_LDFLAGS}`
@@ -37,13 +48,25 @@ cmake -S . -B build-win32-ffmpeg -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DBINK_WITH_FFMPEG=ON -DBINK_FFMPEG_STATIC=ON -DBINK_BUILD_TESTS=OFF
 cmake --build build-win32-ffmpeg --target binkw32 -j4
+# Comprobar nombres y, si MinGW aplica una transformación uniforme,
+# volver a enlazar con el .def corregido (requiere PKG_CONFIG_LIBDIR).
+mode="$(python3 tools/choose_mingw_def.py docs/exports.json \
+  build-win32-ffmpeg/binkw32.dll)"
+if [ "$mode" != verified ]; then
+  cmake -S . -B build-win32-ffmpeg -G Ninja \
+    -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw32.cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBINK_WITH_FFMPEG=ON -DBINK_FFMPEG_STATIC=ON -DBINK_BUILD_TESTS=OFF \
+    -DBINK_MINGW_PUBLIC_NAME_PREFIX="$mode"
+  cmake --build build-win32-ffmpeg --target binkw32 -j4
+fi
 python3 tools/check_win32_dll.py build-win32-ffmpeg/binkw32.dll \
   --require-static-ffmpeg --cmake-cache build-win32-ffmpeg/CMakeCache.txt
 ```
 
 Resultado: `build-win32-ffmpeg/binkw32.dll`. El workflow copia únicamente ese archivo a `dist/`.
 
-**Nivel de verificación:** los siete tests nativos pasan y se ha validado la
+**Nivel de verificación:** los ocho tests nativos pasan y se ha validado la
 exportación PE32 de los 66 nombres/ordinales con un enlazador COFF mediante
 un programa de pruebas independiente. También se comprobó la presencia de
 `-lavformat`, `-lavcodec`, `-lavutil`, `-lswscale`, `-lswresample` y

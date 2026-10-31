@@ -20,7 +20,15 @@ def main():
         public = item['name']
         internal = public[1:]
         assert declaration.strip() == f'{public} = {internal} @{item["ordinal"]}', declaration
-    print('OK: all 66 MinGW aliases match the source export manifest')
+    for prefix, mark in (('double', '__'), ('none', '')):
+        adjusted = generate(ROOT / 'src/binkw32.def', ROOT / 'docs/exports.json', prefix)
+        lines = adjusted.splitlines()
+        assert len(lines) - 2 == 66
+        for declaration, item in zip(lines[2:], entries):
+            assert declaration.strip() == (
+                f'{mark}{item["name"][1:]} = {item["name"][1:]} @{item["ordinal"]}'
+            ), declaration
+    print('OK: all 66 MinGW aliases for single/double/none public prefixes')
 
 
 if __name__ == '__main__':

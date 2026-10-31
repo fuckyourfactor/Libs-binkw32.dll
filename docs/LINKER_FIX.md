@@ -46,3 +46,33 @@ Repetir GitHub Actions con el código actualizado, confirmar enlace exitoso
 con el GCC MinGW de Ubuntu y los binarios FFmpeg compilados realmente, y
 validar la decodificación con un fichero `.bik` legal. Las pruebas locales
 no garantizan ejecución multimedia ni compatibilidad total con el juego.
+
+## Segundo arreglo: comprobador de exportaciones en GitHub Actions
+
+El workflow enlazó correctamente `binkw32.dll`, pero el antiguo
+`tools/check_def.py` informó de **0 exportaciones**. Esa cifra era el número
+de entradas que coincidían con una expresión regular de la salida de
+`objdump`, **no una lectura directa del directorio PE**. El registro no
+permite determinar si el PE exportaba correctamente los 66 nombres o si el
+linker había modificado su decoración. No se debe asumir ninguna de las dos.
+
+Solución implementada:
+
+- `tools/pe_exports.py` lee directamente el PE32, las secciones, el directorio
+  de exportaciones, los punteros de nombres y la tabla de ordinales. Errores
+  de PE truncado/dañado son errores reales, no una lista vacía.
+- `tools/check_def.py` compara los nombres y ordinales exactos. Si difieren,
+  muestra los primeros ordinales y nombres encontrados.
+- `tools/choose_mingw_def.py` decide si el primer DLL ya está bien (`verified`)
+  o si GNU ld le quitó (`double`) o añadió (`none`) un único `_` a cada nombre.
+  Cualquier otra diferencia interrumpe el workflow.
+- `BINK_MINGW_PUBLIC_NAME_PREFIX` permite a CMake generar otra variante del
+  `.def` y enlazar nuevamente. **La verificación estricta vuelve a ejecutarse
+  después de reconstruir**; no se modifica el manifiesto original.
+- `tests/test_pe_exports.py` comprueba archivos PE32 sintéticos, ordinales no
+  consecutivos, detección de errores y selección de la corrección.
+
+**Verificado localmente:** ocho pruebas nativas y comparación directa PE32
+contra la DLL de referencia y contra el binario anterior (66/66). **No
+verificado:** el resultado de la recompilación real con FFmpeg/MinGW en el
+runner remoto; el workflow debe confirmarlo antes de publicar su artefacto.
