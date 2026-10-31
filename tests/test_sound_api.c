@@ -1,4 +1,7 @@
 #include "bink32.h"
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <assert.h>
 #include <stdio.h>
 int main(void){
@@ -6,7 +9,10 @@ int main(void){
  assert(driver!=0);
  assert(BinkSetSoundSystem(BinkOpenWaveOut,0)==1);
  assert(BinkSetSoundSystem(0,0)==1);
- assert(BinkSetSoundSystem(BinkOpenDirectSound,0)==0);
+ assert(BinkOpenDirectSound(0)==driver);
+ assert(BinkOpenMiles(0)==driver);
+ assert(BinkSetSoundSystem(BinkOpenDirectSound,0)==1);
+ assert(BinkSetSoundSystem(BinkOpenMiles,0)==1);
  BINKSND snd={0};
  /* On non-Windows targets WaveOut cannot initialize; gracefully reject it. */
 #ifndef _WIN32

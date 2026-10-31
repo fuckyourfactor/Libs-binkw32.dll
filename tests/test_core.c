@@ -1,5 +1,6 @@
 #include "bink32.h"
 #include "container.h"
+#include "private.h"
 #include <stdio.h>
 #ifdef NDEBUG
 #undef NDEBUG
@@ -59,13 +60,18 @@ int main(void){
  assert(!bk_packet(&i,3,0,&packet,&packet_bytes));
  FILE *af=fopen("synthetic_audio.bik","wb");assert(af);
  assert(fwrite(audio_movie,1,sizeof(audio_movie),af)==sizeof(audio_movie));fclose(af);
+ /* rFactor can select audio by zero-based track index (not stream ID). */
+ U32 selected_track=0;
+ BinkSetSoundTrack(1,&selected_track);
  HBINK ba=BinkOpen("synthetic_audio.bik",0);assert(ba);
+ assert(((BkHandle*)ba)->audio_track==0);
  assert(BinkGetTrackID(ba,0)==1234);assert(BinkGetTrackMaxSize(ba,0)==32);
  assert(BinkGetTrackType(ba,0)==0x2000);
  HBINKTRACK bt=BinkOpenTrack(ba,0);assert(bt);
  assert(bt->Frequency==22050&&bt->Channels==2&&bt->Bits==16);
  assert(BinkGetTrackData(bt,NULL)==0); /* audio decode unsupported */
  BinkCloseTrack(bt);BinkClose(ba);remove("synthetic_audio.bik");
+ BinkSetSoundTrack(0,NULL);
  put32(audio_movie+68,800000);assert(!bk_packet(&i,0,0,&packet,&packet_bytes));
  bk_index_free(&i);
  BinkSetError("test-error");assert(strcmp(BinkGetError(),"test-error")==0);

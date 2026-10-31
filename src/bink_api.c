@@ -7,6 +7,7 @@
 #include "pixel.h"
 #include "audio.h"
 #include "surface.h"
+#include "trace.h"
 #define HANDLE(x) ((BkHandle*)(x))
 static char g_error[256];
 static char g_buffer_error[256];
@@ -38,17 +39,18 @@ BK_API char* BK_CALL BinkBufferGetError(void){return g_buffer_error;}
 BK_API HBINK BK_CALL BinkOpen(const char *name,U32 flags){
  size_t len=0;uint8_t *data=NULL;BkHandle *h=NULL;
  error("");
- if(!name){error("BinkOpen: null filename");return NULL;}
+ if(!name){error("BinkOpen: null filename");bk_trace("BinkOpen null filename flags=0x%08X",flags);return NULL;}
+ bk_trace("BinkOpen path=%.220s flags=0x%08X",name,flags);
  if(flags & (BINKFROMMEMORY|0x00800000u|0x02000000u)){
   error("BinkOpen: memory, existing-handle and custom-IO sources not implemented");return NULL;
  }
  data=bk_load_file(name,&len);
- if(!data){error("BinkOpen: file inaccessible or exceeds 256 MiB");return NULL;}
+ if(!data){error("BinkOpen: file inaccessible or exceeds 256 MiB");bk_trace("BinkOpen failed to read file");return NULL;}
  h=(BkHandle*)bk_alloc(sizeof(*h));
  if(!h){bk_free(data);error("Out of memory");return NULL;}
  bk_memset(h,0,sizeof(*h));
  if(!bk_parse(data,len,&h->index)){
-  bk_free(data);bk_free(h);error("BinkOpen: invalid or unsupported Bink 1 container");return NULL;
+  bk_free(data);bk_free(h);error("BinkOpen: invalid or unsupported Bink 1 container");bk_trace("BinkOpen invalid Bink header / frame index");return NULL;
  }
  h->file=data;
  h->path=strdup_local(name);
@@ -63,15 +65,32 @@ BK_API HBINK BK_CALL BinkOpen(const char *name,U32 flags){
  h->video_enabled=1;h->sound_enabled=1;h->next_tick=bk_millis();
  h->volume=32768;h->pan=32768;h->audio_track=UINT32_MAX;
  if(h->index.tracks && g_sound_count==0)h->audio_track=0;
- else for(U32 t=0;t<h->index.tracks;t++)for(U32 selected=0;selected<g_sound_count;selected++){
-  if(h->index.track_ids[t]==g_sound_tracks[selected]){h->audio_track=t;break;}
+ else for(U32 selected=0;selected<g_sound_count;selected++){
+  /* BinkSetSoundTrack normally receives zero-based stream indices.
+   * Accept matching stream IDs as a fallback for older integrations. */
+  U32 wanted=g_sound_tracks[selected];
+  if(wanted<h->index.tracks){h->audio_track=wanted;break;}
+  for(U32 t=0;t<h->index.tracks;t++)
+   if(h->index.track_ids[t]==wanted){h->audio_track=t;break;}
+  if(h->audio_track!=UINT32_MAX)break;
  }
 
  h->rgb_free=(g_allocator&&g_deallocator)?g_deallocator:NULL;
  h->rgb=(unsigned char*)alloc_local((size_t)h->api.Width*h->api.Height*4);
  if(!h->rgb||!h->path){BinkClose(&h->api);error("Out of memory");return NULL;}
  update_frame_sizes(h);
- if(!bk_decoder_open(h,name))error("BinkOpen: parsed; video decoder unavailable (build with BINK_WITH_FFMPEG)");
+ if(!bk_decoder_open(h,name)){
+#ifdef BINK_WITH_FFMPEG
+  /* Never return a movie handle that is guaranteed to fail at DoFrame. */
+  error("BinkOpen: FFmpeg could not initialize this Bink video");
+  bk_trace("BinkOpen FFmpeg decoder initialization FAILED");
+  BinkClose(&h->api);
+  return NULL;
+#else
+  error("BinkOpen: parsed; video decoder unavailable (build with BINK_WITH_FFMPEG)");
+#endif
+ }
+ bk_trace("BinkOpen OK %ux%u frames=%u audio_tracks=%u selected=%u",h->api.Width,h->api.Height,h->api.Frames,h->index.tracks,h->audio_track);
  return &h->api;
 }
 BK_API void BK_CALL BinkClose(HBINK b){
@@ -84,7 +103,7 @@ BK_API S32 BK_CALL BinkDoFrame(HBINK b){
  uint32_t start=bk_millis();
  if(h->video_enabled){
   if(!bk_decoder_frame(h,b->FrameNum-1)){
-   error("BinkDoFrame: video decoding failed or unavailable");return 0;
+   error("BinkDoFrame: video decoding failed or unavailable");bk_trace("BinkDoFrame VIDEO FAILED frame=%u",b->FrameNum);return 0;
   }
   h->last_decode_ms=bk_millis()-start;
   b->NumRects=1;b->FrameRects[0]=(BINKRECT){0,0,(S32)b->Width,(S32)b->Height};
@@ -93,21 +112,25 @@ BK_API S32 BK_CALL BinkDoFrame(HBINK b){
   const uint8_t *pcm=NULL;U32 size=0;
   uint32_t astart=bk_millis();
   if(!bk_audio_get(h,h->audio_track,b->FrameNum-1,&pcm,&size)){
-   error("BinkDoFrame: audio decoding failed");return 0;
+   /* An unavailable audio device or malformed audio packet must not prevent
+    * displaying a valid decoded video frame. */
+   bk_trace("BinkDoFrame audio decode unavailable frame=%u track=%u",b->FrameNum,h->audio_track);
+   size=0;
   }
   h->last_audio_decode_ms=bk_millis()-astart;
   if(!h->audio_device){
    U32 track=h->audio_track;
    h->audio_device=bk_wave_open(h->index.track_rates[track],
      (h->index.track_types[track]&0x2000u)?2:1);
-   if(!h->audio_device){error("BinkDoFrame: audio device unavailable");return 0;}
+   if(!h->audio_device){bk_trace("BinkDoFrame WaveOut device unavailable, video continues");h->sound_enabled=0;}
   }
-  if(size && !bk_wave_submit(h->audio_device,(const int16_t*)pcm,size,h->volume,h->pan)){
-   error("BinkDoFrame: WaveOut queue full or failed");return 0;
+  if(size && h->audio_device && !bk_wave_submit(h->audio_device,(const int16_t*)pcm,size,h->volume,h->pan)){
+   bk_trace("BinkDoFrame audio output queue full frame=%u; video continues",b->FrameNum);
   }
  }
  b->LastFrameNum=b->FrameNum;h->frame_decoded=b->FrameNum;
  h->played++;
+ if(b->FrameNum<=3)bk_trace("BinkDoFrame decoded frame=%u size=%u",b->FrameNum,b->FrameSize);
  return 1;
 }
 BK_API void BK_CALL BinkNextFrame(HBINK b){
@@ -152,7 +175,7 @@ BK_API S32 BK_CALL BinkGetRects(HBINK b,U32 flags){
 BK_API S32 BK_CALL BinkCopyToBufferRect(HBINK b,void *dst,S32 pitch,U32 dh,U32 dx,U32 dy,U32 sx,U32 sy,U32 sw,U32 sh,U32 flags){
  if(!valid(b)||!dst||HANDLE(b)->frame_decoded!=b->FrameNum){error("No decoded frame available");return 0;}
  if(!bk_pixels_copy(HANDLE(b)->rgb,b->Width,b->Height,dst,pitch,dh,dx,dy,sx,sy,sw,sh,flags)){
-  error("Invalid surface, stride, rectangle, or unsupported format");return 0;
+  error("Invalid surface, stride, rectangle, or unsupported format");bk_trace("BinkCopyToBufferRect FAILED format=%u pitch=%d dstheight=%u dst=(%u,%u) src=(%u,%u %ux%u)",flags,pitch,dh,dx,dy,sx,sy,sw,sh);return 0;
  }
  return 1;
 }
@@ -235,16 +258,28 @@ BK_API void BK_CALL BinkSetSoundTrack(U32 n,U32 *ids){
  if(n)bk_memcpy(g_sound_tracks,ids,(size_t)n*sizeof(U32));
 }
 BK_API S32 BK_CALL BinkSetSoundSystem(BINKSNDSYSOPEN o,uintptr_t p){
- if(!o){g_sound_system=NULL;g_sound_param=0;return 1;}
- if(o!=BinkOpenWaveOut){error("Only BinkOpenWaveOut sound system supported");return 0;}
- g_sound_system=o;g_sound_param=p;return 1;
+ if(!o){g_sound_system=NULL;g_sound_param=0;bk_trace("BinkSetSoundSystem disabled");return 1;}
+ if(o!=BinkOpenWaveOut && o!=BinkOpenDirectSound && o!=BinkOpenMiles){
+  error("Unknown sound system backend");bk_trace("BinkSetSoundSystem unknown backend");return 0;
+ }
+ /* DirectSound/Miles need not be loaded or initialized by the substitute.
+  * The decoded PCM is routed independently to WinMM WaveOut. */
+ g_sound_system=o;g_sound_param=p;
+ bk_trace("BinkSetSoundSystem accepted backend=%s",o==BinkOpenMiles?"Miles (WaveOut fallback)":o==BinkOpenDirectSound?"DirectSound (WaveOut fallback)":"WaveOut");
+ return 1;
 }
-BK_API BINKSNDOPEN BK_CALL BinkOpenDirectSound(uintptr_t p){(void)p;unsupported("DirectSound backend not implemented");return NULL;}
 extern S32 BK_CALL bk_sound_waveout_open(BINKSND*,U32,S32,S32,U32,HBINK);
+BK_API BINKSNDOPEN BK_CALL BinkOpenDirectSound(uintptr_t p){
+ (void)p; /* Valid callback, backed by WinMM without needing a DirectSound interface. */
+ return bk_sound_waveout_open;
+}
 BK_API BINKSNDOPEN BK_CALL BinkOpenWaveOut(uintptr_t p){
  (void)p;return bk_sound_waveout_open;
 }
-BK_API BINKSNDOPEN BK_CALL BinkOpenMiles(uintptr_t p){(void)p;unsupported("Miles backend not implemented");return NULL;}
+BK_API BINKSNDOPEN BK_CALL BinkOpenMiles(uintptr_t p){
+ (void)p; /* PCM playback uses WinMM, not the proprietary Miles DLL. */
+ return bk_sound_waveout_open;
+}
 BK_API void BK_CALL BinkGetPalette(void *p){(void)p;unsupported("Palette is not exposed in the RGB backend");}
 BK_API void* BK_CALL BinkLogoAddress(void){unsupported("Embedded proprietary logo intentionally not included");return NULL;}
 BK_API U32 BK_CALL RADTimerRead(void){

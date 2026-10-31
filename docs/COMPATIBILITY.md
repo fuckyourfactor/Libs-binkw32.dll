@@ -45,8 +45,8 @@
 | 39 | `_BinkLogoAddress@0` | NO | No incluye material gráfico propietario |
 | 40 | `_BinkNextFrame@4` | UNITARIO | Avance/ciclo de fotogramas y temporizador |
 | 41 | `_BinkOpen@8` | UNITARIO | Lee contenedor Bink1 válido, indexa y prepara estado; decodificación opcional |
-| 42 | `_BinkOpenDirectSound@4` | NO | No dispone de salida DirectSound |
-| 43 | `_BinkOpenMiles@4` | NO | No dispone de adaptador Miles |
+| 42 | `_BinkOpenDirectSound@4` | PARCIAL | Devuelve adaptador PCM WinMM funcional como alternativa; sin implementación nativa DirectSound, no probado en rFactor |
+| 43 | `_BinkOpenMiles@4` | PARCIAL | Devuelve adaptador PCM WinMM funcional como alternativa; sin mezcla nativa de Miles, no probado en rFactor |
 | 44 | `_BinkOpenTrack@8` | PARCIAL | Crea descriptor de frecuencia/canales; no decodifica audio |
 | 45 | `_BinkOpenWaveOut@4` | NO | No dispone de salida WaveOut |
 | 46 | `_BinkPause@8` | UNITARIO | Estado de pausa de reloj; sin audio conectado |
@@ -63,8 +63,8 @@
 | 57 | `_BinkSetPan@12` | NO | No hay sistema de audio |
 | 58 | `_BinkSetSimulate@4` | NO | Sin simulación de retrasos de IO |
 | 59 | `_BinkSetSoundOnOff@8` | PARCIAL | Registra estado sin salida sonora |
-| 60 | `_BinkSetSoundSystem@8` | NO | No integra controlador de audio |
-| 61 | `_BinkSetSoundTrack@8` | NO | No se vincula lista a audio reproducible |
+| 60 | `_BinkSetSoundSystem@8` | PARCIAL | Acepta WaveOut, Miles y DirectSound usando salida WinMM independiente; dispositivo sin verificar |
+| 61 | `_BinkSetSoundTrack@8` | PARCIAL | Selecciona pista por índice y por ID como alternativa; Bink audio real sin probar |
 | 62 | `_BinkSetVideoOnOff@8` | PARCIAL | Controla si se pide fotograma al decodificador |
 | 63 | `_BinkSetVolume@12` | NO | Volumen no conectado a audio |
 | 64 | `_BinkShouldSkip@4` | PARCIAL | Heurística de latencia, sin sincronización audio |

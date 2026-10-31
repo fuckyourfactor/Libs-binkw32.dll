@@ -192,3 +192,51 @@ y una prueba de regresión `tests/test_win32_imports.py`. El workflow
 `.github/workflows/build.yml` mantiene la comprobación estricta de las 66
 exportaciones y exige que FFmpeg esté enlazado estáticamente (sin importar
 bibliotecas `avcodec-*.dll`, etc.). El resultado sigue siendo `binkw32.dll`.
+
+## rFactor.exe: parche de reproducción (análisis PE estático)
+
+Esta revisión inspeccionó la tabla de importaciones del `rFactor.exe` suministrado
+(SHA-256 `84cb37a9e8e63abaf057af6e4aa2011125a9e915bfbe1f160afc2da0d19d1466`).
+El ejecutable importa **16** funciones de Bink: las 66 exportaciones del proyecto
+las incluyen sin cambios de nombre ni ordinal. Se detectaron cadenas de error de
+**Miles** y **DirectSound** dentro del ejecutable, y ambas API estaban rechazadas
+por la versión anterior de `bink-open`.
+
+Cambios orientados a rFactor:
+
+- `BinkSetSoundSystem` ahora acepta sus funciones de apertura Miles y DirectSound,
+  en lugar de devolver error antes de abrir el vídeo.
+- Esas entradas suministran un controlador PCM real **WinMM WaveOut**, independiente
+  de Miles y DirectSound (no reemplaza sus interfaces nativas).
+- `BinkSetSoundTrack` reconoce los índices cero-basados utilizados por la API.
+- La falta de dispositivo de sonido, la cola de audio llena o un error de
+  decodificación de pista no abortan el fotograma de **vídeo** ya decodificado.
+- La compilación `BINK_WITH_FFMPEG=ON` informa de error en `BinkOpen` si falla
+  la inicialización del decodificador de vídeo, en vez de devolver un handle
+  inútil al juego.
+- Diagnóstico opcional, sin conectividad externa ni dependencias adicionales:
+  desde PowerShell, en el directorio de rFactor:
+
+  ```powershell
+  $env:BINK_OPEN_TRACE = "$env:TEMP\bink-open.log"
+  .\rFactor.exe
+  Get-Content "$env:TEMP\bink-open.log"
+  ```
+
+  En el registro aparecen la ruta del vídeo, las banderas de apertura, el
+  resultado del decodificador, el backend de audio y errores de copia de
+  superficies, con los que se puede identificar la siguiente incompatibilidad.
+
+Para revisar las importaciones sin ejecutar el juego:
+
+```bash
+python3 tools/check_rfactor_imports.py /ruta/a/rFactor.exe
+```
+
+**Estado:** el análisis de los imports y las pruebas locales confirman el arreglo
+específico del rechazo de los backends de audio y la compilación de la DLL
+sin FFmpeg. **No se ha podido verificar que rFactor reproduzca vídeo**: el
+usuario proporcionó `rFactor.exe` pero no los `.bik`, y este entorno no ejecuta
+el juego con Direct3D y FFmpeg Win32. Para reproducción se requiere el binario
+**con FFmpeg** creado por `.github/workflows/build.yml`, no la variante
+local sin decodificador. Este parche conserva la salida única `binkw32.dll`.

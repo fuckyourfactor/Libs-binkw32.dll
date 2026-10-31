@@ -11,6 +11,7 @@ malloc
 free
 memcpy
 memset
+_vsnprintf
 END
 cat > build-win32/kernel.def <<'END'
 LIBRARY KERNEL32.dll
@@ -21,6 +22,8 @@ ReadFile@20=ReadFile
 CloseHandle@4=CloseHandle
 GetTickCount@0=GetTickCount
 Sleep@4=Sleep
+GetEnvironmentVariableA@12=GetEnvironmentVariableA
+WriteFile@20=WriteFile
 END
 cat > build-win32/user.def <<'END'
 LIBRARY USER32.dll
@@ -52,14 +55,14 @@ for item in crt kernel user gdi winmm; do
     "/def:build-win32/$item.def" "/implib:build-win32/$item.lib" \
     "/out:build-win32/$item.dll"
 done
-for src in bink_api container pixel audio_mix sound_driver surface audio_win32 platform_win32 decoder_none; do
+for src in bink_api container pixel audio_mix sound_driver surface trace audio_win32 platform_win32 decoder_none; do
   clang -target i686-pc-windows-msvc -O2 -std=c11 -ffreestanding \
     -fno-stack-protector -Iinclude -Isrc -DBINK_BUILD \
     -c "src/$src.c" -o "build-win32/$src.obj"
 done
 aliases=()
 for entry in CreateFileA@28 GetFileSize@8 ReadFile@20 CloseHandle@4 GetTickCount@0 \
-             Sleep@4 GetDC@4 GetClientRect@8 ClientToScreen@8 ReleaseDC@8 StretchDIBits@52 waveOutOpen@24 waveOutPrepareHeader@12 waveOutUnprepareHeader@12 waveOutWrite@12 waveOutReset@4 waveOutPause@4 waveOutRestart@4 waveOutClose@4; do
+             Sleep@4 GetEnvironmentVariableA@12 WriteFile@20 GetDC@4 GetClientRect@8 ClientToScreen@8 ReleaseDC@8 StretchDIBits@52 waveOutOpen@24 waveOutPrepareHeader@12 waveOutUnprepareHeader@12 waveOutWrite@12 waveOutReset@4 waveOutPause@4 waveOutRestart@4 waveOutClose@4; do
   aliases+=("/alternatename:__imp__${entry}=__imp_${entry}")
 done
 lld-link /dll /machine:x86 /safeseh:no /entry:DllMain@12 /nodefaultlib \
