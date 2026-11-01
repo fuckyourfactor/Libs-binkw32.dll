@@ -66,3 +66,20 @@ int bk_packet(const BkIndex *x,uint32_t frame,uint32_t track,const uint8_t **p,u
  }
  return 0;
 }
+
+int bk_video_packet(const BkIndex *x,uint32_t frame,const uint8_t **p,uint32_t *n){
+ if(!x||frame>=x->frames||!p||!n)return 0;
+ uint32_t pos=x->offset[frame],end=x->offset[frame+1];
+ if(end>x->file_size||pos>=end)return 0;
+ for(uint32_t i=0;i<x->tracks;i++){
+  if(end-pos<4)return 0;
+  uint32_t bytes=rd32(x->data+pos);
+  pos+=4;
+  if(bytes>end-pos)return 0;
+  pos+=bytes;
+ }
+ if(pos>=end)return 0;
+ *p=x->data+pos;
+ *n=end-pos;
+ return 1;
+}

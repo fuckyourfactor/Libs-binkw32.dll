@@ -16,6 +16,12 @@ int main(void){
  BkIndex i={0};assert(bk_parse(movie,sizeof(movie),&i));
  assert(i.frames==2&&i.offset[0]==52&&i.offset[1]==56);
  assert(i.key[0]==1&&i.key[1]==1);
+ const unsigned char *video=NULL;uint32_t video_bytes=0;
+ assert(bk_video_packet(&i,0,&video,&video_bytes));
+ assert(video==movie+52&&video_bytes==4);
+ assert(bk_video_packet(&i,1,&video,&video_bytes));
+ assert(video==movie+56&&video_bytes==4);
+ assert(!bk_video_packet(&i,2,&video,&video_bytes));
  bk_index_free(&i);assert(!bk_parse(movie,32,&i));
 
  assert(bk_parse(movie,sizeof(movie),&i));bk_index_free(&i);
@@ -72,6 +78,8 @@ int main(void){
  const unsigned char *packet=NULL;uint32_t packet_bytes=0;
  assert(bk_packet(&i,0,0,&packet,&packet_bytes));
  assert(packet_bytes==8&&packet==audio_movie+68);
+ assert(bk_video_packet(&i,0,&video,&video_bytes));
+ assert(video==audio_movie+76&&video_bytes==4);
  assert(bk_packet(&i,1,0,&packet,&packet_bytes)&&packet_bytes==0);
  assert(!bk_packet(&i,3,0,&packet,&packet_bytes));
  FILE *af=fopen("synthetic_audio.bik","wb");assert(af);
@@ -88,7 +96,9 @@ int main(void){
  assert(BinkGetTrackData(bt,NULL)==0);
  BinkCloseTrack(bt);BinkClose(ba);remove("synthetic_audio.bik");
  BinkSetSoundTrack(0,NULL);
- put32(audio_movie+64,800000);assert(!bk_packet(&i,0,0,&packet,&packet_bytes));
+ put32(audio_movie+64,800000);
+ assert(!bk_packet(&i,0,0,&packet,&packet_bytes));
+ assert(!bk_video_packet(&i,0,&video,&video_bytes));
  bk_index_free(&i);
  BinkSetError("test-error");assert(strcmp(BinkGetError(),"test-error")==0);
  assert(RADTimerRead()==0);

@@ -11,5 +11,6 @@ typedef struct BkIndex {
 
 int bk_parse(const uint8_t *buf,size_t len,BkIndex *out);
 void bk_index_free(BkIndex *idx);
+int bk_video_packet(const BkIndex *idx,uint32_t frame,const uint8_t **data,uint32_t *bytes);
 int bk_packet(const BkIndex *idx,uint32_t frame,uint32_t track,const uint8_t **p,uint32_t *n);
 #endif

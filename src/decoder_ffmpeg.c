@@ -2,15 +2,14 @@
 #include "platform.h"
 #include <limits.h>
 #include <errno.h>
-#include <stdio.h>
-#include <libavutil/error.h>
-#include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/mem.h>
 #include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
-#define BK_PCM_LIMIT (8u*1024u*1024u)
+
+#define BK_PCM_LIMIT (8u * 1024u * 1024u)
+
 typedef struct BkFFAudio {
  AVCodecContext *ctx;
  AVFrame *decoded;
@@ -23,48 +22,16 @@ typedef struct BkFFAudio {
  uint32_t cached_frame;
  int configured;
 } BkFFAudio;
-typedef struct BkMemoryIO {
- const uint8_t *data;
- int64_t length;
- int64_t position;
-} BkMemoryIO;
 
-static int bink_read(void *opaque,uint8_t *dst,int count){
- BkMemoryIO *io=(BkMemoryIO*)opaque;
- if(count<=0)return AVERROR(EINVAL);
- if(io->position>=io->length)return AVERROR_EOF;
- int64_t remain=io->length-io->position;
- if((int64_t)count>remain)count=(int)remain;
- bk_memcpy(dst,io->data+io->position,(size_t)count);
- io->position+=count;
- return count;
-}
-static int64_t bink_seek(void *opaque,int64_t offset,int whence){
- BkMemoryIO *io=(BkMemoryIO*)opaque;
- if(whence==AVSEEK_SIZE)return io->length;
- whence &= ~AVSEEK_FORCE;
- int64_t base;
- if(whence==SEEK_SET)base=0;
- else if(whence==SEEK_CUR)base=io->position;
- else if(whence==SEEK_END)base=io->length;
- else return AVERROR(EINVAL);
-
- if(offset< -base || offset>io->length-base)return AVERROR(EINVAL);
- io->position=base+offset;
- return io->position;
-}
 typedef struct BkFFmpeg {
- BkMemoryIO source;
- AVIOContext *io;
- AVFormatContext *fmt;
  AVCodecContext *codec;
  AVFrame *frame;
- AVPacket *pkt;
+ AVPacket *packet;
  struct SwsContext *sws;
- int stream;
- int64_t next;
+ uint32_t next;
  BkFFAudio **audio;
 } BkFFmpeg;
+
 static void audio_close(BkFFAudio *a){
  if(!a)return;
  avcodec_free_context(&a->ctx);
@@ -74,91 +41,94 @@ static void audio_close(BkFFAudio *a){
  av_free(a->pcm);
  bk_free(a);
 }
+
 void bk_decoder_close(BkHandle *h){
  BkFFmpeg *d=(BkFFmpeg*)h->decoder;
  if(!d)return;
  if(d->audio){for(uint32_t i=0;i<h->index.tracks;i++)audio_close(d->audio[i]);bk_free(d->audio);}
  sws_freeContext(d->sws);
- av_packet_free(&d->pkt);av_frame_free(&d->frame);
- avcodec_free_context(&d->codec);avformat_close_input(&d->fmt);
- avio_context_free(&d->io);
- bk_free(d);h->decoder=NULL;
+ av_packet_free(&d->packet);
+ av_frame_free(&d->frame);
+ avcodec_free_context(&d->codec);
+ bk_free(d);
+ h->decoder=NULL;
 }
+
 int bk_decoder_open(BkHandle *h,const char *path){
  (void)path;
- BkFFmpeg *d=(BkFFmpeg*)bk_alloc(sizeof(*d));const AVCodec *codec;
- if(!d)return 0;bk_memset(d,0,sizeof(*d));h->decoder=d;
- if(!h->file||h->index.file_size<44||h->index.file_size>INT64_MAX)goto failed;
- d->source.data=h->file;
- d->source.length=(int64_t)h->index.file_size;
- uint8_t *iobuf=(uint8_t*)av_malloc(32768);
- if(!iobuf)goto failed;
- d->io=avio_alloc_context(iobuf,32768,0,&d->source,bink_read,NULL,bink_seek);
- if(!d->io){av_free(iobuf);goto failed;}
- d->fmt=avformat_alloc_context();if(!d->fmt)goto failed;
- d->fmt->pb=d->io;
- d->fmt->flags|=AVFMT_FLAG_CUSTOM_IO;
- if(avformat_open_input(&d->fmt,NULL,NULL,NULL)<0 || avformat_find_stream_info(d->fmt,NULL)<0)goto failed;
- d->stream=av_find_best_stream(d->fmt,AVMEDIA_TYPE_VIDEO,-1,-1,NULL,0);
- if(d->stream<0)goto failed;
- AVStream *stream=d->fmt->streams[d->stream];
- codec=avcodec_find_decoder(stream->codecpar->codec_id);
+ if(!h||!h->file||h->index.file_size<44)return 0;
+ BkFFmpeg *d=(BkFFmpeg*)bk_alloc(sizeof(*d));
+ if(!d)return 0;
+ bk_memset(d,0,sizeof(*d));
+ h->decoder=d;
+ const AVCodec *codec=avcodec_find_decoder(AV_CODEC_ID_BINKVIDEO);
  if(!codec)goto failed;
- d->codec=avcodec_alloc_context3(codec);if(!d->codec)goto failed;
- if(avcodec_parameters_to_context(d->codec,stream->codecpar)<0 || avcodec_open2(d->codec,codec,NULL)<0)goto failed;
- if(d->codec->width!=(int)h->api.Width || d->codec->height!=(int)h->api.Height)goto failed;
- d->frame=av_frame_alloc();d->pkt=av_packet_alloc();
- if(!d->frame||!d->pkt)goto failed;
+ d->codec=avcodec_alloc_context3(codec);
+ if(!d->codec)goto failed;
+ d->codec->codec_tag=h->index.marker;
+ d->codec->width=(int)h->index.width;
+ d->codec->height=(int)h->index.height;
+ d->codec->extradata=(uint8_t*)av_mallocz(4u+AV_INPUT_BUFFER_PADDING_SIZE);
+ if(!d->codec->extradata)goto failed;
+ bk_memcpy(d->codec->extradata,h->file+36,4);
+ d->codec->extradata_size=4;
+ if(avcodec_open2(d->codec,codec,NULL)<0)goto failed;
+ d->frame=av_frame_alloc();
+ d->packet=av_packet_alloc();
+ if(!d->frame||!d->packet)goto failed;
  if(h->index.tracks){
   d->audio=(BkFFAudio**)bk_alloc((size_t)h->index.tracks*sizeof(*d->audio));
   if(!d->audio)goto failed;
   bk_memset(d->audio,0,(size_t)h->index.tracks*sizeof(*d->audio));
  }
- d->next=0;return 1;
+ return 1;
  failed:bk_decoder_close(h);return 0;
+}
+
+static int decode_packet(BkHandle *h,BkFFmpeg *d,uint32_t frame){
+ const uint8_t *data=NULL;
+ uint32_t size=0;
+ if(!bk_video_packet(&h->index,frame,&data,&size) || size>INT_MAX)return 0;
+ av_packet_unref(d->packet);
+ if(av_new_packet(d->packet,(int)size)<0)return 0;
+ bk_memcpy(d->packet->data,data,size);
+ d->packet->pts=frame;
+ if(h->index.key[frame])d->packet->flags|=AV_PKT_FLAG_KEY;
+ int ret=avcodec_send_packet(d->codec,d->packet);
+ av_packet_unref(d->packet);
+ if(ret<0)return 0;
+ av_frame_unref(d->frame);
+ return avcodec_receive_frame(d->codec,d->frame)==0;
 }
 
 int bk_decoder_frame(BkHandle *h,uint32_t target){
  BkFFmpeg *d=(BkFFmpeg*)h->decoder;
  if(!d||!h->rgb||target>=h->api.Frames)return 0;
- if((int64_t)target<d->next-1){
-
-  bk_decoder_close(h);
-  if(!bk_decoder_open(h,NULL))return 0;
-  d=(BkFFmpeg*)h->decoder;
+ if(target<d->next){
+  if(target+1!=d->next){
+   bk_decoder_close(h);
+   if(!bk_decoder_open(h,NULL))return 0;
+   d=(BkFFmpeg*)h->decoder;
+  }else if(!d->frame->data[0])return 0;
  }
- if((int64_t)target==d->next-1){
-  if(!d->frame->data[0])return 0;
- } else {
-  while(d->next<=(int64_t)target){
-   int got=0;
-   while(av_read_frame(d->fmt,d->pkt)>=0){
-    if(d->pkt->stream_index==d->stream){
-     int send=avcodec_send_packet(d->codec,d->pkt);
-     if(send>=0){
-      int ret=avcodec_receive_frame(d->codec,d->frame);
-      if(ret==0)got=1;
-     }
-    }
-    av_packet_unref(d->pkt);
-    if(got)break;
-   }
-   if(!got)return 0;
-   d->next++;
-  }
+ while(d->next<=target){
+  if(!decode_packet(h,d,d->next))return 0;
+  d->next++;
  }
+ if(d->frame->width!=(int)h->api.Width || d->frame->height!=(int)h->api.Height)return 0;
  d->sws=sws_getCachedContext(d->sws,d->frame->width,d->frame->height,
     (enum AVPixelFormat)d->frame->format,d->frame->width,d->frame->height,
     AV_PIX_FMT_BGRA,SWS_BILINEAR,NULL,NULL,NULL);
- if(!d->sws || d->frame->width!=(int)h->api.Width || d->frame->height!=(int)h->api.Height)return 0;
+ if(!d->sws)return 0;
  uint8_t *planes[4]={h->rgb,NULL,NULL,NULL};
  int linesize[4]={(int)(h->api.Width*4),0,0,0};
  return sws_scale(d->sws,(const uint8_t * const*)d->frame->data,d->frame->linesize,
-                   0,d->codec->height,planes,linesize)==d->codec->height;
+                  0,d->frame->height,planes,linesize)==d->frame->height;
 }
+
 static BkFFAudio *audio_open(BkHandle *h,uint32_t track){
  BkFFmpeg *d=(BkFFmpeg*)h->decoder;
- if(!d || !d->audio || track>=h->index.tracks)return NULL;
+ if(!d||!d->audio||track>=h->index.tracks)return NULL;
  if(d->audio[track])return d->audio[track];
  BkFFAudio *a=(BkFFAudio*)bk_alloc(sizeof(*a));
  if(!a)return NULL;
@@ -180,6 +150,7 @@ static BkFFAudio *audio_open(BkHandle *h,uint32_t track){
  a->configured=1;return a;
  failed:d->audio[track]=NULL;audio_close(a);return NULL;
 }
+
 static int convert_audio_frame(BkFFAudio *a){
  AVFrame *f=a->decoded;
  if(!a->swr){
@@ -194,12 +165,17 @@ static int convert_audio_frame(BkFFAudio *a){
  int channels=a->ctx->ch_layout.nb_channels;
  if(max_samples<=0||max_samples>INT_MAX/4||channels<=0||channels>2)return 0;
  size_t bytes=(size_t)max_samples*(size_t)channels*2u;
- if(bytes>BK_PCM_LIMIT || bytes>BK_PCM_LIMIT-a->pcm_size)return 0;
+ if(bytes>BK_PCM_LIMIT||bytes>BK_PCM_LIMIT-a->pcm_size)return 0;
  size_t required=(size_t)a->pcm_size+bytes;
  if(a->pcm_cap<required){
-  uint8_t *buf=(uint8_t*)av_realloc(a->pcm,required);
+  size_t capacity=a->pcm_cap?a->pcm_cap:4096;
+  while(capacity<required){
+   if(capacity>BK_PCM_LIMIT/2){capacity=BK_PCM_LIMIT;break;}
+   capacity*=2;
+  }
+  uint8_t *buf=(uint8_t*)av_realloc(a->pcm,capacity);
   if(!buf)return 0;
-  a->pcm=buf;a->pcm_cap=required;
+  a->pcm=buf;a->pcm_cap=capacity;
  }
  uint8_t *out[1]={a->pcm+a->pcm_size};
  int n=swr_convert(a->swr,out,max_samples,(const uint8_t**)f->extended_data,f->nb_samples);
@@ -229,7 +205,7 @@ int bk_audio_get(BkHandle *h,uint32_t track,uint32_t frame,
    av_packet_unref(a->packet);
    if(ret<0)return 0;
    while((ret=avcodec_receive_frame(a->ctx,a->decoded))>=0){
-    if(i==frame && !convert_audio_frame(a)){
+    if(i==frame&&!convert_audio_frame(a)){
      av_frame_unref(a->decoded);return 0;
     }
     av_frame_unref(a->decoded);

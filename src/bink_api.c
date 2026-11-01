@@ -142,6 +142,7 @@ BK_API S32 BK_CALL BinkDoFrame(HBINK b){
  }
  b->LastFrameNum=b->FrameNum;h->frame_decoded=b->FrameNum;
  h->played++;
+#ifdef BINK_ENABLE_TRACE
  if(b->FrameNum<=3){
 
   U32 sample=0;size_t pixels=(size_t)b->Width*b->Height;
@@ -151,6 +152,7 @@ BK_API S32 BK_CALL BinkDoFrame(HBINK b){
    b->FrameNum,b->FrameSize,sample,b->FrameRects[0].Left,b->FrameRects[0].Top,
    b->FrameRects[0].Width,b->FrameRects[0].Height);
  }
+#endif
  return 1;
 }
 BK_API void BK_CALL BinkNextFrame(HBINK b){
@@ -204,10 +206,12 @@ BK_API S32 BK_CALL BinkGetRects(HBINK b,U32 flags){
   return 0;
  }
  b->NumRects=1;b->FrameRects[0]=(BINKRECT){0,0,(S32)b->Width,(S32)b->Height};
+#ifdef BINK_ENABLE_TRACE
  if(HANDLE(b)->trace_rect_count++<12)
   bk_trace("BinkGetRects OK decoded=%u next=%u flags=0x%08X count=%d rect=(%d,%d,%d,%d)",
    HANDLE(b)->frame_decoded,b->FrameNum,flags,b->NumRects,b->FrameRects[0].Left,b->FrameRects[0].Top,
    b->FrameRects[0].Width,b->FrameRects[0].Height);
+#endif
  return 1;
 }
 
@@ -215,21 +219,27 @@ BK_API S32 BK_CALL BinkCopyToBufferRect(HBINK b,void *dst,S32 pitch,U32 dh,U32 d
  if(!valid(b)||!dst||!has_presentable_frame(HANDLE(b))){
   error("No decoded frame available");
 
+#ifdef BINK_ENABLE_TRACE
   if(b && HANDLE(b)->trace_copy_failure_count++ < 12)
    bk_trace("BinkCopyToBufferRect no frame b=%p dst=%p next=%u decoded=%u",(void*)b,dst,
             b->FrameNum,HANDLE(b)->frame_decoded);
+#endif
   return 0;
  }
  if(!bk_pixels_copy(HANDLE(b)->rgb,b->Width,b->Height,dst,pitch,dh,dx,dy,sx,sy,sw,sh,flags)){
   error("Invalid surface, stride, rectangle, or unsupported format");
+#ifdef BINK_ENABLE_TRACE
   if(HANDLE(b)->trace_copy_failure_count++ < 12)
    bk_trace("BinkCopyToBufferRect FAILED decoded=%u next=%u flags=0x%08X pitch=%d dstheight=%u dst=(%u,%u) src=(%u,%u %ux%u)",
             HANDLE(b)->frame_decoded,b->FrameNum,flags,pitch,dh,dx,dy,sx,sy,sw,sh);
+#endif
   return 0;
  }
+#ifdef BINK_ENABLE_TRACE
  if(HANDLE(b)->trace_copy_count++<12)
   bk_trace("BinkCopyToBufferRect OK decoded=%u next=%u flags=0x%08X pitch=%d dstheight=%u dst=(%u,%u) src=(%u,%u %ux%u)",
            HANDLE(b)->frame_decoded,b->FrameNum,flags,pitch,dh,dx,dy,sx,sy,sw,sh);
+#endif
  return 1;
 }
 BK_API S32 BK_CALL BinkCopyToBuffer(HBINK b,void *dst,S32 pitch,U32 h,U32 x,U32 y,U32 flags){

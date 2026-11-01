@@ -20,7 +20,9 @@ typedef struct BkHandle {
  int volume,pan;
  uint32_t last_audio_decode_ms;
 
+#ifdef BINK_ENABLE_TRACE
  uint32_t trace_rect_count, trace_copy_count, trace_copy_failure_count;
+#endif
 
 } BkHandle;
 

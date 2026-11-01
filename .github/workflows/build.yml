@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 90
     env:
       FFMPEG_VERSION: '7.1.5'
+      UPX_VERSION: '5.3.0'
       FFMPEG_BUILD_ROOT: ${{ github.workspace }}/.build-ffmpeg
       FFMPEG_PREFIX: ${{ github.workspace }}/.build-ffmpeg/prefix
     steps:
@@ -29,7 +30,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             gcc-mingw-w64-i686-win32 binutils-mingw-w64-i686 \
-            cmake ninja-build make pkgconf curl xz-utils python3
+            cmake ninja-build make pkgconf curl xz-utils python3 nasm
           i686-w64-mingw32-gcc --version
 
       - name: Run portable unit tests before the cross-build
@@ -39,8 +40,23 @@ jobs:
           cmake --build build-native --parallel 4
           ctest --test-dir build-native --output-on-failure
 
-      - name: Build FFmpeg Bink decoders as static Win32 libraries
+      - name: Restore minimal FFmpeg libraries from cache
+        uses: actions/cache@v4
+        id: ffmpeg-cache
+        with:
+          path: .build-ffmpeg/prefix
+          key: ffmpeg-bink-x86-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-${{ hashFiles('tools/build_ffmpeg_mingw32.sh') }}
+
+      - name: Build only the required FFmpeg Bink codecs and conversion libraries
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: bash tools/build_ffmpeg_mingw32.sh
+
+      - name: Verify minimal FFmpeg installation
+        run: |
+          for module in avcodec avutil swscale swresample; do
+            test -s "$FFMPEG_PREFIX/lib/lib${module}.a"
+          done
+          test ! -e "$FFMPEG_PREFIX/lib/libavformat.a"
 
       - name: Configure replacement DLL with FFmpeg enabled
         env:
@@ -53,6 +69,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DBINK_WITH_FFMPEG=ON \
             -DBINK_FFMPEG_STATIC=ON \
+            -DBINK_MINIMIZE_SIZE=ON \
+            -DBINK_ENABLE_TRACE=OFF \
             -DBINK_BUILD_TESTS=OFF
 
           cmake --build build-win32-ffmpeg --target binkw32 --parallel 4 --verbose
@@ -75,6 +93,8 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DBINK_WITH_FFMPEG=ON \
               -DBINK_FFMPEG_STATIC=ON \
+              -DBINK_MINIMIZE_SIZE=ON \
+              -DBINK_ENABLE_TRACE=OFF \
               -DBINK_BUILD_TESTS=OFF \
               -DBINK_MINGW_PUBLIC_NAME_PREFIX="$mode"
             cmake --build build-win32-ffmpeg --target binkw32 --parallel 4 --verbose
@@ -83,14 +103,35 @@ jobs:
           python3 tools/check_def.py src/binkw32.def \
             tools/exports.json build-win32-ffmpeg/binkw32.dll
 
+      - name: Install pinned UPX executable packer
+        run: |
+          curl -fL --retry 3 \
+            "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-amd64_linux.tar.xz" \
+            -o /tmp/upx.tar.xz
+          echo '79cea8a50b6fa102d10c7b79a419cd77dead3cc2d78661de2dc5e5815dc505c1  /tmp/upx.tar.xz' | sha256sum --check --status
+          mkdir -p /tmp/upx
+          tar -xJf /tmp/upx.tar.xz -C /tmp/upx
+          install -m 755 "/tmp/upx/upx-${UPX_VERSION}-amd64_linux/upx" /usr/local/bin/upx
+          upx --version
+
       - name: Verify PE32, exact exports, static multimedia link, and filename
         run: |
           python3 tools/check_win32_dll.py \
             build-win32-ffmpeg/binkw32.dll \
             --require-static-ffmpeg \
             --cmake-cache build-win32-ffmpeg/CMakeCache.txt
+          i686-w64-mingw32-strip --strip-unneeded build-win32-ffmpeg/binkw32.dll
+          python3 tools/check_win32_dll.py \
+            build-win32-ffmpeg/binkw32.dll \
+            --require-static-ffmpeg \
+            --cmake-cache build-win32-ffmpeg/CMakeCache.txt
           mkdir -p dist
           install -m 644 build-win32-ffmpeg/binkw32.dll dist/binkw32.dll
+          bash tools/pack_dll.sh dist/binkw32.dll build-win32-ffmpeg/CMakeCache.txt
+          python3 tools/check_win32_dll.py \
+            dist/binkw32.dll \
+            --require-static-ffmpeg \
+            --cmake-cache build-win32-ffmpeg/CMakeCache.txt
           test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 1
           sha256sum dist/binkw32.dll
 

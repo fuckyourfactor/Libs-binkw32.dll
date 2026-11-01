@@ -12,7 +12,7 @@ case "$version" in
   *[!0-9.]*|'') echo "Invalid FFmpeg version: $version" >&2; exit 1 ;;
 esac
 
-for program in curl tar make pkg-config i686-w64-mingw32-gcc i686-w64-mingw32-ar; do
+for program in curl tar make pkg-config nasm i686-w64-mingw32-gcc i686-w64-mingw32-ar; do
   command -v "$program" >/dev/null || { echo "Missing: $program" >&2; exit 1; }
 done
 
@@ -35,31 +35,34 @@ cd "$build_root/build"
   --cross-prefix=i686-w64-mingw32- \
   --enable-cross-compile \
   --enable-static \
+  --enable-small \
+  --enable-lto \
   --disable-shared \
   --disable-programs \
   --disable-doc \
   --disable-debug \
+  --disable-runtime-cpudetect \
   --disable-avdevice \
   --disable-avfilter \
+  --disable-avformat \
   --disable-network \
   --disable-autodetect \
-  --disable-asm \
   --disable-pthreads \
   --enable-w32threads \
   --disable-everything \
-  --enable-demuxer=bink \
   --enable-decoder=bink,binkaudio_dct,binkaudio_rdft \
-  --enable-protocol=file
+  --disable-protocols \
+  --extra-cflags="-Os -ffunction-sections -fdata-sections -fno-ident -fno-unwind-tables -fno-asynchronous-unwind-tables"
 
 make -j"$(nproc)"
 make install
 
-for module in avformat avcodec avutil swscale swresample; do
+for module in avcodec avutil swscale swresample; do
   test -s "$prefix/lib/lib${module}.a" || {
     echo "Missing static FFmpeg library: lib${module}.a" >&2; exit 1;
   }
 done
 
 PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig" \
-  pkg-config --static --exists libavformat libavcodec libavutil libswscale libswresample
+  pkg-config --static --exists libavcodec libavutil libswscale libswresample
 printf 'FFmpeg %s static Windows x86 libraries at: %s\n' "$version" "$prefix"

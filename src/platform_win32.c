@@ -53,7 +53,7 @@ void bk_free(void *p){free(p);}
 void *bk_memcpy(void*d,const void*s,size_t n){return memcpy(d,s,n);}
 void *bk_memset(void*d,int v,size_t n){return memset(d,v,n);}
 unsigned char *bk_load_file(const char *path,size_t *size){
- void *f=CreateFileA(path,0x80000000u,1|2,NULL,3,0x80u,NULL);
+ void *f=CreateFileA(path,0x80000000u,1|2,NULL,3,0x08000000u,NULL);
  if(f==(void*)-1)return NULL;
  unsigned int high=0,n=GetFileSize(f,&high),got=0;unsigned char *p=NULL;
  if(high || n==0xffffffffu || n>256u*1024u*1024u)goto done;
